@@ -5,6 +5,8 @@
 /target/
 /landing/target/
 /landing/data/
+/landing/deploy/public/
+/landing/deploy/.export-waitlist.tsv
 **/*.rs.bk
 
 # Environment and local data

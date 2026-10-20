@@ -1,0 +1,16 @@
+[package]
+name = "dainiki-landing"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+topcoat = { version = "0.10.0", features = ["tailwind", "asset", "font"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+dotenvy = "0.15"
+
+[build-dependencies]
+topcoat = { version = "0.10.0", default-features = false, features = ["tailwind"] }

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="wash" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fef8f6"/>
+      <stop offset="0.55" stop-color="#f8f2f0"/>
+      <stop offset="1" stop-color="#f2edeb"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="0%" r="70%">
+      <stop offset="0" stop-color="#c6ebd1" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#c6ebd1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#wash)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <g opacity="0.18" stroke="#32533f" fill="none">
+    <path d="M900 70c80 0 150 58 150 150s-70 150-150 150-150-58-150-150 70-150 150-150Z"/>
+    <path d="M900 120c52 0 100 38 100 100s-48 100-100 100-100-38-100-100 48-100 100-100Z"/>
+    <path d="M900 170c26 0 50 20 50 50s-24 50-50 50-50-20-50-50 24-50 50-50Z"/>
+  </g>
+
+  <g transform="translate(80 72)">
+    <rect width="58" height="58" rx="14" fill="#32533f"/>
+    <path d="M29 13c7 8 8 17 3 26-2 4-5 7-8 9-1-9 0-18 5-27 1-2 0-4-2-4-8 2-14 8-15 16-1 7 3 13 10 15 8 2 15-2 18-9 3-8 1-17-5-24-2-2-6-2-6 0Z" fill="#c5ead0"/>
+    <text x="74" y="24" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="25" font-weight="600" fill="#1d1b1a" letter-spacing="-0.5">Dainiki</text>
+    <text x="74" y="46" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="13" fill="#727973" letter-spacing="2">BY SMBL</text>
+  </g>
+
+  <g transform="translate(80 178)">
+    <rect width="360" height="31" rx="15.5" fill="#ede7e5"/>
+    <circle cx="18" cy="15.5" r="4" fill="#32533f"/>
+    <text x="32" y="20" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#424843" letter-spacing="1.8">OPEN SOURCE · LOCAL-FIRST · TEXT-ONLY</text>
+  </g>
+
+  <text x="80" y="300" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="76" fill="#1d1b1a" letter-spacing="-2.5">A quiet, continuous river</text>
+  <text x="80" y="382" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="76" fill="#1d1b1a" letter-spacing="-2.5">for your thoughts.</text>
+
+  <text x="82" y="438" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="22" fill="#424843">A text-only, local-first daily journal for the web.</text>
+  <text x="82" y="472" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="22" fill="#424843">Plain Markdown. No account. Optional encrypted sync.</text>
+
+  <g transform="translate(80 532)">
+    <rect width="190" height="46" rx="8" fill="#32533f"/>
+    <text x="24" y="29" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#ffffff">Start writing free</text>
+  </g>
+
+  <text x="80" y="612" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="14" fill="#727973">dainiki.smbl.dev  ·  MIT  ·  Rust + Topcoat</text>
+
+  <text x="900" y="566" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="26" font-style="italic" fill="#944924" opacity="0.8">No photos. No feeds.</text>
+  <text x="900" y="598" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="26" font-style="italic" fill="#944924" opacity="0.8">Just words.</text>
+</svg>

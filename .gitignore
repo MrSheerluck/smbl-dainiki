@@ -1,0 +1,31 @@
+# Keep the docs folder local; only the root README is committed.
+/docs/
+
+# Rust
+/target/
+/landing/target/
+/landing/data/
+**/*.rs.bk
+
+# Environment and local data
+.env
+.env.*
+!.env.example
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Wrangler local cache
+.wrangler/
+
+# Frontend dependencies/build output
+node_modules/
+/web/node_modules/
+/web/dist/
+/web/.vite/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

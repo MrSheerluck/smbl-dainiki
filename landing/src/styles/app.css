@@ -268,34 +268,55 @@ html[data-theme="dark"] .theme-icon-moon {
   transform: rotate(0deg) scale(1);
 }
 
+.theme-pixel-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.theme-pixel-grid rect {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0);
+}
+
+html.theme-pixel-wiping .theme-pixel-grid rect {
+  animation: theme-pixel-in 340ms cubic-bezier(0.22, 1, 0.36, 1) var(--pixel-delay) both;
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
+  ::view-transition-group(root) {
     animation: none;
-    mix-blend-mode: normal;
   }
 
   ::view-transition-old(root) {
     z-index: 1;
+    animation: none;
+    mix-blend-mode: normal;
   }
 
   ::view-transition-new(root) {
     z-index: 2;
-    clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%);
-    animation: theme-diagonal-wipe 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    will-change: clip-path;
+    clip-path: url(#theme-pixel-grid);
+    animation: theme-pixel-hold 640ms linear both;
+    mix-blend-mode: normal;
   }
 }
 
-@keyframes theme-diagonal-wipe {
-  0% {
-    clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%);
+@keyframes theme-pixel-in {
+  to {
+    transform: scale(1);
   }
-  52% {
-    clip-path: polygon(48% 0, 100% 0, 100% 100%, 0 100%);
-  }
-  100% {
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+}
+
+@keyframes theme-pixel-hold {
+  from,
+  to {
+    opacity: 1;
   }
 }
 

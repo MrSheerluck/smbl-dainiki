@@ -244,6 +244,61 @@ details[open] .faq-plus {
   transform: rotate(45deg);
 }
 
+.theme-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  transition:
+    opacity 220ms ease,
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.theme-icon-moon {
+  opacity: 0;
+  transform: rotate(-70deg) scale(0.6);
+}
+
+html[data-theme="dark"] .theme-icon-sun {
+  opacity: 0;
+  transform: rotate(70deg) scale(0.6);
+}
+
+html[data-theme="dark"] .theme-icon-moon {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  ::view-transition-old(root) {
+    z-index: 1;
+  }
+
+  ::view-transition-new(root) {
+    z-index: 2;
+    clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%);
+    animation: theme-diagonal-wipe 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: clip-path;
+  }
+}
+
+@keyframes theme-diagonal-wipe {
+  0% {
+    clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%);
+  }
+  52% {
+    clip-path: polygon(48% 0, 100% 0, 100% 100%, 0 100%);
+  }
+  100% {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  }
+}
+
 .code-tree {
   color: color-mix(in oklab, var(--color-on-surface) 72%, transparent);
 }

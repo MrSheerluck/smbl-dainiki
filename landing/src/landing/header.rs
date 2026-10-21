@@ -80,11 +80,11 @@ pub async fn header() -> Result<impl View> {
                         data-theme-toggle="true"
                         aria-label="Toggle light and dark theme"
                         title="Toggle theme"
-                        class="h-9 w-9 inline-flex items-center justify-center rounded border border-outline-variant/60 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+                        class="relative h-9 w-9 inline-flex items-center justify-center rounded border border-outline-variant/60 text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
                     >
                         <svg
                             aria-hidden="true"
-                            class="h-4 w-4"
+                            class="theme-icon theme-icon-sun h-4 w-4"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
@@ -101,6 +101,18 @@ pub async fn header() -> Result<impl View> {
                             <path d="m5.6 18.4 1.4-1.4"></path>
                             <path d="m17 7 1.4-1.4"></path>
                             <circle cx="12" cy="12" r="4"></circle>
+                        </svg>
+                        <svg
+                            aria-hidden="true"
+                            class="theme-icon theme-icon-moon h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path>
                         </svg>
                     </button>
                     <a

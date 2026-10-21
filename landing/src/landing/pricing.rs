@@ -105,11 +105,6 @@ pub async fn pricing() -> Result<impl View> {
                     <div
                         class="relative flex flex-col p-7 rounded-xl bg-surface-container-lowest border-2 border-primary/70 shadow-xl"
                     >
-                        <div
-                            class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-primary text-on-primary font-ui-caption text-ui-caption uppercase tracking-wider"
-                        >
-                            "Optional"
-                        </div>
                         <div class="flex items-center justify-between">
                             <h3
                                 class="font-headline-md text-headline-md text-on-surface"

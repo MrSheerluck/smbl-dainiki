@@ -26,19 +26,6 @@ pub async fn hero(status: Option<WaitlistStatus>) -> Result<impl View> {
             <div
                 class="max-w-5xl mx-auto px-6 lg:px-12 text-center flex flex-col items-center"
             >
-                <div
-                    class="inline-flex flex-wrap items-center justify-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-high/80 text-on-surface-variant font-ui-caption text-ui-caption shadow-sm mb-8"
-                >
-                    <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                    <span class="font-ui-label text-ui-label tracking-wide uppercase">
-                        "Open source"
-                    </span>
-                    <span class="text-outline-variant">"·"</span>
-                    <span>"Local-first"</span>
-                    <span class="text-outline-variant">"·"</span>
-                    <span class="text-primary font-medium">"Text-only"</span>
-                </div>
-
                 <h1
                     class="font-headline-lg text-[2.6rem] leading-[1.08] sm:text-[3.65rem] sm:leading-[1.04] tracking-tight text-on-surface max-w-4xl text-balance"
                 >
@@ -53,19 +40,11 @@ pub async fn hero(status: Option<WaitlistStatus>) -> Result<impl View> {
                     "A private, local-first daily journal for the web. Plain Markdown, a calm timeline, tags, search, and a calendar. Sync only if you want it."
                 </p>
 
-                <div class="mt-9 flex flex-col items-center gap-2">
-                    <span
-                        class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-ui-caption text-ui-caption uppercase tracking-wide"
-                    >
-                        <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
-                        "Coming soon"
-                    </span>
-                    <p
-                        class="font-journal-body text-journal-body text-on-surface-variant max-w-md"
-                    >
-                        "The journal is in development. Join the waitlist for the first release."
-                    </p>
-                </div>
+                <p
+                    class="mt-9 font-journal-body text-journal-body text-on-surface-variant max-w-md"
+                >
+                    "The journal is in development. Join the waitlist for the first release."
+                </p>
 
                 <p
                     class="mt-4 font-ui-caption text-ui-caption text-on-surface-variant max-w-lg"

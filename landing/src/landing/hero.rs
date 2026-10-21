@@ -53,27 +53,24 @@ pub async fn hero(status: Option<WaitlistStatus>) -> Result<impl View> {
                     "A private, local-first daily journal for the web. Plain Markdown, a calm timeline, tags, search, and a calendar. Sync only if you want it."
                 </p>
 
-                <div
-                    class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3 w-full sm:w-auto"
-                >
-                    <a
-                        class="inline-flex w-full sm:w-auto items-center justify-center px-6 py-3 rounded bg-primary text-on-primary font-ui-header text-ui-header shadow hover:bg-primary-container hover:text-on-primary-container transition-all"
-                        href="/app"
+                <div class="mt-9 flex flex-col items-center gap-2">
+                    <span
+                        class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-ui-caption text-ui-caption uppercase tracking-wide"
                     >
-                        "Start writing free"
-                    </a>
-                    <a
-                        class="inline-flex w-full sm:w-auto items-center justify-center px-6 py-3 rounded border border-outline-variant/80 text-on-surface font-ui-header text-ui-header hover:bg-surface-container transition-all"
-                        href="#pricing"
+                        <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                        "Coming soon"
+                    </span>
+                    <p
+                        class="font-journal-body text-journal-body text-on-surface-variant max-w-md"
                     >
-                        "See sync pricing"
-                    </a>
+                        "The journal is in development. Join the waitlist for the first release."
+                    </p>
                 </div>
 
                 <p
-                    class="mt-5 font-ui-caption text-ui-caption text-on-surface-variant max-w-lg"
+                    class="mt-4 font-ui-caption text-ui-caption text-on-surface-variant max-w-lg"
                 >
-                    "No account is needed for local journaling. Sync is $2/month or $20/year."
+                    "Local journaling will be free. Sync will be $2/month or $20/year."
                 </p>
 
                 <div id="waitlist" class="mt-7 w-full max-w-md scroll-mt-28">

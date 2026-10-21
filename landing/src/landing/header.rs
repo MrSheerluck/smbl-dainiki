@@ -104,10 +104,10 @@ pub async fn header() -> Result<impl View> {
                         </svg>
                     </button>
                     <a
-                        class="hidden sm:inline-flex items-center px-4 py-2 rounded bg-primary text-on-primary font-ui-label text-ui-label hover:bg-primary-container hover:text-on-primary-container shadow-[0_1px_2px_rgba(44,42,41,0.08)] transition-all"
-                        href="/app"
+                        class="hidden sm:inline-flex items-center px-4 py-2 rounded border border-outline-variant text-on-surface font-ui-label text-ui-label hover:bg-surface-container transition-all"
+                        href="#waitlist"
                     >
-                        "Start writing"
+                        "Join the waitlist"
                     </a>
                 </div>
             </div>

@@ -42,7 +42,7 @@ pub async fn faq() -> Result<impl View> {
                     <p
                         class="font-journal-body text-journal-body text-on-surface-variant leading-relaxed mt-3 pr-8"
                     >
-                        "No. Open the app and write. Your journal lives on your device. An account exists only when you choose to pay for sync."
+                        "No. The local journal will open without an account. An account will only be needed for paid sync."
                     </p>
                 </details>
 

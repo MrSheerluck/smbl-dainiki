@@ -87,16 +87,17 @@ pub async fn pricing() -> Result<impl View> {
                             </li>
                         </ul>
                         <div class="mt-auto pt-8">
-                            <a
-                                class="flex items-center justify-center w-full px-5 py-2.5 rounded border border-outline-variant text-on-surface font-ui-label text-ui-label hover:bg-surface-container transition-all"
-                                href="/app"
+                            <button
+                                class="flex items-center justify-center w-full px-5 py-2.5 rounded border border-outline-variant text-on-surface-variant font-ui-label text-ui-label opacity-60 cursor-not-allowed"
+                                type="button"
+                                disabled="true"
                             >
-                                "Start writing free"
-                            </a>
+                                "Coming soon"
+                            </button>
                             <p
                                 class="mt-3 text-center font-ui-caption text-ui-caption text-on-surface-variant/70"
                             >
-                                "Open the app and write."
+                                "Free local journaling at launch."
                             </p>
                         </div>
                     </div>
@@ -168,22 +169,17 @@ pub async fn pricing() -> Result<impl View> {
                             </li>
                         </ul>
                         <div class="mt-auto pt-8 space-y-2">
-                            <a
-                                class="flex items-center justify-center w-full px-5 py-2.5 rounded bg-primary text-on-primary font-ui-label text-ui-label hover:bg-primary-container hover:text-on-primary-container transition-all"
-                                href="/app?sync=monthly"
+                            <button
+                                class="flex items-center justify-center w-full px-5 py-2.5 rounded bg-primary text-on-primary font-ui-label text-ui-label opacity-60 cursor-not-allowed"
+                                type="button"
+                                disabled="true"
                             >
-                                "Start monthly for $2"
-                            </a>
-                            <a
-                                class="flex items-center justify-center w-full px-5 py-2.5 rounded border border-outline-variant text-on-surface font-ui-label text-ui-label hover:bg-surface-container transition-all"
-                                href="/app?sync=yearly"
-                            >
-                                "Start yearly for $20"
-                            </a>
+                                "Coming soon"
+                            </button>
                             <p
                                 class="text-center font-ui-caption text-ui-caption text-on-surface-variant/70"
                             >
-                                "Billed from day one. Checkout by Dodo Payments."
+                                "Checkout opens at launch. Payments by Dodo Payments."
                             </p>
                         </div>
                     </div>
@@ -242,18 +238,17 @@ pub async fn pricing() -> Result<impl View> {
                             </li>
                         </ul>
                         <div class="mt-auto pt-8">
-                            <a
-                                class="flex items-center justify-center w-full px-5 py-2.5 rounded border border-outline-variant text-on-surface font-ui-label text-ui-label hover:bg-surface-container transition-all"
-                                href="https://github.com/MrSheerluck/smbl-dainiki"
-                                rel="noopener"
-                                target="_blank"
+                            <button
+                                class="flex items-center justify-center w-full px-5 py-2.5 rounded border border-outline-variant text-on-surface-variant font-ui-label text-ui-label opacity-60 cursor-not-allowed"
+                                type="button"
+                                disabled="true"
                             >
-                                "Read the self-host guide"
-                            </a>
+                                "Coming soon"
+                            </button>
                             <p
                                 class="mt-3 text-center font-ui-caption text-ui-caption text-on-surface-variant/70"
                             >
-                                "Bring your own domain, email, and storage."
+                                "The self-host guide lands with the app."
                             </p>
                         </div>
                     </div>

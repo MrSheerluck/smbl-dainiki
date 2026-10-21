@@ -268,26 +268,6 @@ html[data-theme="dark"] .theme-icon-moon {
   transform: rotate(0deg) scale(1);
 }
 
-.theme-pixel-grid {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.theme-pixel-grid rect {
-  transform-box: fill-box;
-  transform-origin: center;
-  transform: scale(0);
-}
-
-html.theme-pixel-wiping .theme-pixel-grid rect {
-  animation: theme-pixel-in 340ms cubic-bezier(0.22, 1, 0.36, 1) var(--pixel-delay) both;
-}
-
 @media (prefers-reduced-motion: no-preference) {
   ::view-transition-group(root) {
     animation: none;
@@ -301,22 +281,38 @@ html.theme-pixel-wiping .theme-pixel-grid rect {
 
   ::view-transition-new(root) {
     z-index: 2;
-    clip-path: url(#theme-pixel-grid);
-    animation: theme-pixel-hold 640ms linear both;
+    -webkit-mask-image: radial-gradient(
+      circle at 100% 0%,
+      #000 0%,
+      #000 28%,
+      transparent 48%
+    );
+    mask-image: radial-gradient(
+      circle at 100% 0%,
+      #000 0%,
+      #000 28%,
+      transparent 48%
+    );
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: 100% 0%;
+    mask-position: 100% 0%;
+    -webkit-mask-size: 0% 0%;
+    mask-size: 0% 0%;
+    animation: theme-ink-bloom 900ms linear both;
+    will-change: mask-size;
     mix-blend-mode: normal;
   }
 }
 
-@keyframes theme-pixel-in {
-  to {
-    transform: scale(1);
+@keyframes theme-ink-bloom {
+  from {
+    -webkit-mask-size: 0% 0%;
+    mask-size: 0% 0%;
   }
-}
-
-@keyframes theme-pixel-hold {
-  from,
   to {
-    opacity: 1;
+    -webkit-mask-size: 340% 340%;
+    mask-size: 340% 340%;
   }
 }
 

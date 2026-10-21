@@ -274,208 +274,186 @@ pub async fn showcase() -> Result<impl View> {
                     </aside>
 
                     <div
-                        class="flex-1 bg-surface p-4 sm:p-8 overflow-hidden text-left relative"
+                        class="flex-1 bg-surface p-4 sm:p-6 lg:p-8 overflow-hidden text-left relative"
                     >
-                        <div class="max-w-[42rem] mx-auto relative">
-                            <div
-                                class="absolute -left-7 top-6 bottom-6 w-px bg-outline-variant/20 hidden xl:block pointer-events-none"
-                            ></div>
-
-                            <article class="relative mb-space-lg pt-1">
-                                <div
-                                    class="absolute -left-24 top-1 text-right hidden xl:block select-none opacity-40"
-                                >
+                        <div class="max-w-[44rem] mx-auto">
+                            <article class="flex gap-4 sm:gap-6 mb-7">
+                                <div class="w-16 sm:w-20 shrink-0 pt-1 text-right">
                                     <span
-                                        class="block font-display-date text-display-date text-outline-variant leading-none"
+                                        class="block font-display-date text-[2.4rem] leading-none text-primary"
                                     >
                                         "20"
                                     </span>
                                     <span
-                                        class="font-ui-caption text-ui-caption tracking-widest uppercase text-on-surface-variant text-[10px]"
+                                        class="mt-1 block font-ui-caption text-[10px] uppercase tracking-widest text-primary"
                                     >
-                                        "TODAY"
+                                        "Today"
+                                    </span>
+                                    <span
+                                        class="mt-0.5 block font-ui-caption text-[10px] text-on-surface-variant/50"
+                                    >
+                                        "Oct 2026"
                                     </span>
                                 </div>
-                                <header class="mb-space-sm">
+                                <div
+                                    class="relative flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6"
+                                >
+                                    <span
+                                        class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-primary/60"
+                                    ></span>
                                     <div
-                                        class="flex items-baseline justify-between gap-y-1 mb-0.5"
+                                        class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/90 p-4 sm:p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)]"
                                     >
-                                        <div class="flex items-center gap-2">
-                                            <span
-                                                class="inline-block w-2 h-2 rounded-full bg-primary animate-pulse"
-                                            ></span>
+                                        <div
+                                            class="flex items-baseline justify-between gap-3 mb-3"
+                                        >
                                             <h3
                                                 class="font-headline-md text-headline-md text-on-surface tracking-tight font-normal"
                                             >
-                                                "Today, Tuesday, October 20"
+                                                "The slow return of morning fog"
                                             </h3>
-                                        </div>
-                                        <span
-                                            class="font-ui-caption text-ui-caption text-on-surface-variant/50 flex items-center gap-1"
-                                        >
-                                            <span class="text-[13px] leading-none">"✎"</span>
-                                            "Click to write"
-                                        </span>
-                                    </div>
-                                    <h4
-                                        class="font-headline-sm text-[1.1rem] text-secondary font-normal italic"
-                                    >
-                                        "The slow return of morning fog"
-                                    </h4>
-                                </header>
-                                <div
-                                    class="space-y-space-sm font-journal-body text-[0.95rem] text-on-surface leading-relaxed"
-                                >
-                                    <p
-                                        class="first-letter:font-journal-body-lg first-letter:text-[2.2rem] first-letter:leading-none first-letter:float-left first-letter:mr-2 first-letter:font-normal first-letter:text-primary"
-                                    >
-                                        "Before the sun cleared the ridgeline, the entire gorge lay suspended under a pale river vapor. Walking the bamboo path at this hour is an exercise in acoustic subtraction: only the steady, hollow knocking of towering culms overhead. I stopped for roasted tea by the hearth, grateful for an unhurried morning."
-                                    </p>
-                                    <blockquote
-                                        class="border-l-2 border-secondary/40 pl-4 py-1 my-4 font-journal-quote text-journal-quote text-on-surface-variant italic"
-                                    >
-                                        "The day did not ask to be optimized. It asked to be noticed."
-                                    </blockquote>
-                                    <p>
-                                        "A few lines before the inbox opens. A small record of what the light was doing, and what I was thinking while it did it."
-                                    </p>
-                                    <div class="pt-1 flex items-center justify-between gap-3">
-                                        <div
-                                            class="flex items-center gap-2 font-ui-caption text-ui-caption text-on-surface-variant/60"
-                                        >
-                                            <span class="text-secondary/70 font-mono">"#morning"</span>
-                                            <span class="text-secondary/70 font-mono">
-                                                "#reflections"
+                                            <span
+                                                class="hidden sm:inline font-ui-caption text-ui-caption text-on-surface-variant/40 whitespace-nowrap"
+                                            >
+                                                "Saved just now"
                                             </span>
                                         </div>
-                                        <span
-                                            class="font-ui-caption text-ui-caption text-on-surface-variant/40"
+                                        <div
+                                            class="space-y-space-sm font-journal-body text-[0.95rem] text-on-surface leading-relaxed"
                                         >
-                                            "Saved just now"
-                                        </span>
-                                    </div>
-                                    <div
-                                        class="pt-1 text-on-surface-variant/40 flex items-center gap-1.5"
-                                    >
-                                        <span
-                                            class="w-0.5 h-4 bg-primary/70 animate-pulse inline-block"
-                                        ></span>
-                                        <span class="italic font-journal-body text-xs">
-                                            "Add thoughts for today..."
-                                        </span>
+                                            <p
+                                                class="first-letter:font-journal-body-lg first-letter:text-[2.2rem] first-letter:leading-none first-letter:float-left first-letter:mr-2 first-letter:font-normal first-letter:text-primary"
+                                            >
+                                                "Before the sun cleared the ridgeline, the entire gorge lay suspended under a pale river vapor. Walking the bamboo path at this hour is an exercise in acoustic subtraction: only the steady, hollow knocking of towering culms overhead. I stopped for roasted tea by the hearth, grateful for an unhurried morning."
+                                            </p>
+                                            <blockquote
+                                                class="border-l-2 border-secondary/40 pl-4 py-1 my-4 font-journal-quote text-journal-quote text-on-surface-variant italic"
+                                            >
+                                                "The day did not ask to be optimized. It asked to be noticed."
+                                            </blockquote>
+                                            <p>
+                                                "A few lines before the inbox opens. A small record of what the light was doing, and what I was thinking while it did it."
+                                            </p>
+                                            <div class="pt-1 flex items-center justify-between gap-3">
+                                                <div
+                                                    class="flex items-center gap-2 font-ui-caption text-ui-caption text-on-surface-variant/60"
+                                                >
+                                                    <span class="text-secondary/70 font-mono">"#morning"</span>
+                                                    <span class="text-secondary/70 font-mono">
+                                                        "#reflections"
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="pt-1 text-on-surface-variant/40 flex items-center gap-1.5"
+                                            >
+                                                <span
+                                                    class="w-0.5 h-4 bg-primary/70 animate-pulse inline-block"
+                                                ></span>
+                                                <span class="italic font-journal-body text-xs">
+                                                    "Add thoughts for today..."
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </article>
 
-                            <div class="my-space-md flex items-center justify-center">
-                                <div class="w-12 h-px bg-outline-variant/30"></div>
-                            </div>
-
-                            <article class="relative mb-space-lg pt-1">
-                                <div
-                                    class="absolute -left-24 top-1 text-right hidden xl:block select-none opacity-40"
-                                >
+                            <article class="flex gap-4 sm:gap-6 mb-7">
+                                <div class="w-16 sm:w-20 shrink-0 pt-1 text-right">
                                     <span
-                                        class="block font-display-date text-display-date text-outline-variant leading-none"
+                                        class="block font-display-date text-[2.4rem] leading-none text-on-surface/70"
                                     >
                                         "19"
                                     </span>
                                     <span
-                                        class="font-ui-caption text-ui-caption tracking-widest uppercase text-on-surface-variant text-[10px]"
+                                        class="mt-1 block font-ui-caption text-[10px] uppercase tracking-widest text-on-surface-variant/70"
                                     >
-                                        "MON"
+                                        "Monday"
+                                    </span>
+                                    <span
+                                        class="mt-0.5 block font-ui-caption text-[10px] text-on-surface-variant/50"
+                                    >
+                                        "Oct 2026"
                                     </span>
                                 </div>
-                                <header class="mb-space-sm">
+                                <div
+                                    class="relative flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6"
+                                >
+                                    <span
+                                        class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
+                                    ></span>
                                     <div
-                                        class="flex items-baseline justify-between gap-y-1 mb-0.5"
+                                        class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/70 p-4 sm:p-5"
                                     >
                                         <h3
-                                            class="font-headline-md text-headline-md text-on-surface tracking-tight font-normal"
+                                            class="font-headline-md text-headline-md text-on-surface tracking-tight font-normal mb-3"
                                         >
-                                            "Monday, October 19"
+                                            "A small room for attention"
                                         </h3>
-                                        <span
-                                            class="font-ui-caption text-ui-caption text-on-surface-variant/50 flex items-center gap-1"
+                                        <div
+                                            class="space-y-space-sm font-journal-body text-[0.95rem] text-on-surface leading-relaxed"
                                         >
-                                            <span class="text-[13px] leading-none">"✎"</span>
-                                            "Click to edit"
-                                        </span>
-                                    </div>
-                                    <h4
-                                        class="font-headline-sm text-[1.1rem] text-secondary font-normal italic"
-                                    >
-                                        "A small room for attention"
-                                    </h4>
-                                </header>
-                                <div
-                                    class="space-y-space-sm font-journal-body text-[0.95rem] text-on-surface leading-relaxed"
-                                >
-                                    <p>
-                                        "Spent the morning clearing the desk instead of clearing the inbox. Two notebooks, one pen, a glass of water. The blank page stopped feeling like a debt and started feeling like a room."
-                                    </p>
-                                    <blockquote
-                                        class="border-l-2 border-secondary/40 pl-4 py-1 my-4 font-journal-quote text-journal-quote text-on-surface-variant italic"
-                                    >
-                                        "Attention is a place you can return to."
-                                    </blockquote>
-                                    <div
-                                        class="flex items-center gap-2 font-ui-caption text-ui-caption text-on-surface-variant/60"
-                                    >
-                                        <span class="text-secondary/70 font-mono">"#work"</span>
-                                        <span class="text-secondary/70 font-mono">"#morning"</span>
+                                            <p>
+                                                "Spent the morning clearing the desk instead of clearing the inbox. Two notebooks, one pen, a glass of water. The blank page stopped feeling like a debt and started feeling like a room."
+                                            </p>
+                                            <blockquote
+                                                class="border-l-2 border-secondary/40 pl-4 py-1 my-4 font-journal-quote text-journal-quote text-on-surface-variant italic"
+                                            >
+                                                "Attention is a place you can return to."
+                                            </blockquote>
+                                            <div
+                                                class="flex items-center gap-2 font-ui-caption text-ui-caption text-on-surface-variant/60"
+                                            >
+                                                <span class="text-secondary/70 font-mono">"#work"</span>
+                                                <span class="text-secondary/70 font-mono">"#morning"</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </article>
 
-                            <div class="my-space-md flex items-center justify-center">
-                                <div class="w-12 h-px bg-outline-variant/30"></div>
-                            </div>
-
-                            <article class="relative pt-1">
-                                <div
-                                    class="absolute -left-24 top-1 text-right hidden xl:block select-none opacity-40"
-                                >
+                            <article class="flex gap-4 sm:gap-6">
+                                <div class="w-16 sm:w-20 shrink-0 pt-1 text-right">
                                     <span
-                                        class="block font-display-date text-display-date text-outline-variant leading-none"
+                                        class="block font-display-date text-[2.4rem] leading-none text-on-surface/70"
                                     >
                                         "18"
                                     </span>
                                     <span
-                                        class="font-ui-caption text-ui-caption tracking-widest uppercase text-on-surface-variant text-[10px]"
+                                        class="mt-1 block font-ui-caption text-[10px] uppercase tracking-widest text-on-surface-variant/70"
                                     >
-                                        "SUN"
+                                        "Sunday"
+                                    </span>
+                                    <span
+                                        class="mt-0.5 block font-ui-caption text-[10px] text-on-surface-variant/50"
+                                    >
+                                        "Oct 2026"
                                     </span>
                                 </div>
-                                <header class="mb-space-sm">
-                                    <div
-                                        class="flex items-baseline justify-between gap-y-1 mb-0.5"
-                                    >
-                                        <h3
-                                            class="font-headline-md text-headline-md text-on-surface tracking-tight font-normal"
-                                        >
-                                            "Sunday, October 18"
-                                        </h3>
-                                        <span
-                                            class="font-ui-caption text-ui-caption text-on-surface-variant/50 flex items-center gap-1"
-                                        >
-                                            <span class="text-[13px] leading-none">"✎"</span>
-                                            "Click to edit"
-                                        </span>
-                                    </div>
-                                </header>
                                 <div
-                                    class="space-y-space-sm font-journal-body text-[0.95rem] text-on-surface leading-relaxed"
+                                    class="relative flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6"
                                 >
-                                    <p>
-                                        "Late afternoon sunlight cut cleanly across the white oak table. I left the phone in the other room and wrote until the room turned amber. Nothing important happened. That was the point."
-                                    </p>
+                                    <span
+                                        class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
+                                    ></span>
                                     <div
-                                        class="flex items-center gap-2 font-ui-caption text-ui-caption text-on-surface-variant/60"
+                                        class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/70 p-4 sm:p-5"
                                     >
-                                        <span class="text-secondary/70 font-mono">
-                                            "#reflections"
-                                        </span>
+                                        <div
+                                            class="space-y-space-sm font-journal-body text-[0.95rem] text-on-surface leading-relaxed"
+                                        >
+                                            <p>
+                                                "Late afternoon sunlight cut cleanly across the white oak table. I left the phone in the other room and wrote until the room turned amber. Nothing important happened. That was the point."
+                                            </p>
+                                            <div
+                                                class="flex items-center gap-2 font-ui-caption text-ui-caption text-on-surface-variant/60"
+                                            >
+                                                <span class="text-secondary/70 font-mono">
+                                                    "#reflections"
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </article>

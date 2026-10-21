@@ -280,12 +280,12 @@ pub async fn showcase() -> Result<impl View> {
                             <article class="flex gap-3 sm:gap-4 mb-7">
                                 <div class="w-11 sm:w-14 shrink-0 pt-1 text-right">
                                     <span
-                                        class="block font-display-date text-[1.9rem] sm:text-[2.2rem] leading-none text-primary"
+                                        class="block font-display-date text-[1.9rem] sm:text-[2.2rem] leading-none text-on-surface/70"
                                     >
                                         "20"
                                     </span>
                                     <span
-                                        class="mt-1 block font-ui-caption text-[8px] sm:text-[9px] uppercase tracking-wide text-primary"
+                                        class="mt-1 block font-ui-caption text-[8px] sm:text-[9px] uppercase tracking-wide text-on-surface-variant/70"
                                     >
                                         "Today"
                                     </span>
@@ -299,31 +299,20 @@ pub async fn showcase() -> Result<impl View> {
                                     class="relative flex-1 border-l border-outline-variant/25 pl-3 sm:pl-4"
                                 >
                                     <span
-                                        class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-primary/60"
+                                        class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
                                     ></span>
                                     <div
-                                        class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/90 p-4 sm:p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)]"
+                                        class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-4 sm:p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)]"
                                     >
-                                        <div
-                                            class="flex items-baseline justify-between gap-3 mb-3"
+                                        <h3
+                                            class="font-headline-md text-headline-md text-on-surface tracking-tight font-normal mb-3"
                                         >
-                                            <h3
-                                                class="font-headline-md text-headline-md text-on-surface tracking-tight font-normal"
-                                            >
-                                                "The slow return of morning fog"
-                                            </h3>
-                                            <span
-                                                class="hidden sm:inline font-ui-caption text-ui-caption text-on-surface-variant/40 whitespace-nowrap"
-                                            >
-                                                "Saved just now"
-                                            </span>
-                                        </div>
+                                            "The slow return of morning fog"
+                                        </h3>
                                         <div
                                             class="space-y-space-sm font-journal-body text-[0.95rem] text-on-surface leading-relaxed"
                                         >
-                                            <p
-                                                class="first-letter:font-journal-body-lg first-letter:text-[2.2rem] first-letter:leading-none first-letter:float-left first-letter:mr-2 first-letter:font-normal first-letter:text-primary"
-                                            >
+                                            <p>
                                                 "Before the sun cleared the ridgeline, the entire gorge lay suspended under a pale river vapor. Walking the bamboo path at this hour is an exercise in acoustic subtraction: only the steady, hollow knocking of towering culms overhead. I stopped for roasted tea by the hearth, grateful for an unhurried morning."
                                             </p>
                                             <blockquote
@@ -343,16 +332,6 @@ pub async fn showcase() -> Result<impl View> {
                                                         "#reflections"
                                                     </span>
                                                 </div>
-                                            </div>
-                                            <div
-                                                class="pt-1 text-on-surface-variant/40 flex items-center gap-1.5"
-                                            >
-                                                <span
-                                                    class="w-0.5 h-4 bg-primary/70 animate-pulse inline-block"
-                                                ></span>
-                                                <span class="italic font-journal-body text-xs">
-                                                    "Add thoughts for today..."
-                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -384,7 +363,7 @@ pub async fn showcase() -> Result<impl View> {
                                         class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
                                     ></span>
                                     <div
-                                        class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/70 p-4 sm:p-5"
+                                        class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-4 sm:p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)]"
                                     >
                                         <h3
                                             class="font-headline-md text-headline-md text-on-surface tracking-tight font-normal mb-3"
@@ -438,7 +417,7 @@ pub async fn showcase() -> Result<impl View> {
                                         class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
                                     ></span>
                                     <div
-                                        class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/70 p-4 sm:p-5"
+                                        class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-4 sm:p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)]"
                                     >
                                         <div
                                             class="space-y-space-sm font-journal-body text-[0.95rem] text-on-surface leading-relaxed"

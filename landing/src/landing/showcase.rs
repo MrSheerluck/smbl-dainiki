@@ -277,26 +277,26 @@ pub async fn showcase() -> Result<impl View> {
                         class="flex-1 bg-surface p-4 sm:p-6 lg:p-8 overflow-hidden text-left relative"
                     >
                         <div class="max-w-[44rem] mx-auto">
-                            <article class="flex gap-4 sm:gap-6 mb-7">
-                                <div class="w-16 sm:w-20 shrink-0 pt-1 text-right">
+                            <article class="flex gap-3 sm:gap-4 mb-7">
+                                <div class="w-11 sm:w-14 shrink-0 pt-1 text-right">
                                     <span
-                                        class="block font-display-date text-[2.4rem] leading-none text-primary"
+                                        class="block font-display-date text-[1.9rem] sm:text-[2.2rem] leading-none text-primary"
                                     >
                                         "20"
                                     </span>
                                     <span
-                                        class="mt-1 block font-ui-caption text-[10px] uppercase tracking-widest text-primary"
+                                        class="mt-1 block font-ui-caption text-[8px] sm:text-[9px] uppercase tracking-wide text-primary"
                                     >
                                         "Today"
                                     </span>
                                     <span
-                                        class="mt-0.5 block font-ui-caption text-[10px] text-on-surface-variant/50"
+                                        class="mt-0.5 block font-ui-caption text-[8px] sm:text-[9px] text-on-surface-variant/50"
                                     >
                                         "Oct 2026"
                                     </span>
                                 </div>
                                 <div
-                                    class="relative flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6"
+                                    class="relative flex-1 border-l border-outline-variant/25 pl-3 sm:pl-4"
                                 >
                                     <span
                                         class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-primary/60"
@@ -359,26 +359,26 @@ pub async fn showcase() -> Result<impl View> {
                                 </div>
                             </article>
 
-                            <article class="flex gap-4 sm:gap-6 mb-7">
-                                <div class="w-16 sm:w-20 shrink-0 pt-1 text-right">
+                            <article class="flex gap-3 sm:gap-4 mb-7">
+                                <div class="w-11 sm:w-14 shrink-0 pt-1 text-right">
                                     <span
-                                        class="block font-display-date text-[2.4rem] leading-none text-on-surface/70"
+                                        class="block font-display-date text-[1.9rem] sm:text-[2.2rem] leading-none text-on-surface/70"
                                     >
                                         "19"
                                     </span>
                                     <span
-                                        class="mt-1 block font-ui-caption text-[10px] uppercase tracking-widest text-on-surface-variant/70"
+                                        class="mt-1 block font-ui-caption text-[8px] sm:text-[9px] uppercase tracking-wide text-on-surface-variant/70"
                                     >
                                         "Monday"
                                     </span>
                                     <span
-                                        class="mt-0.5 block font-ui-caption text-[10px] text-on-surface-variant/50"
+                                        class="mt-0.5 block font-ui-caption text-[8px] sm:text-[9px] text-on-surface-variant/50"
                                     >
                                         "Oct 2026"
                                     </span>
                                 </div>
                                 <div
-                                    class="relative flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6"
+                                    class="relative flex-1 border-l border-outline-variant/25 pl-3 sm:pl-4"
                                 >
                                     <span
                                         class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
@@ -413,26 +413,26 @@ pub async fn showcase() -> Result<impl View> {
                                 </div>
                             </article>
 
-                            <article class="flex gap-4 sm:gap-6">
-                                <div class="w-16 sm:w-20 shrink-0 pt-1 text-right">
+                            <article class="flex gap-3 sm:gap-4">
+                                <div class="w-11 sm:w-14 shrink-0 pt-1 text-right">
                                     <span
-                                        class="block font-display-date text-[2.4rem] leading-none text-on-surface/70"
+                                        class="block font-display-date text-[1.9rem] sm:text-[2.2rem] leading-none text-on-surface/70"
                                     >
                                         "18"
                                     </span>
                                     <span
-                                        class="mt-1 block font-ui-caption text-[10px] uppercase tracking-widest text-on-surface-variant/70"
+                                        class="mt-1 block font-ui-caption text-[8px] sm:text-[9px] uppercase tracking-wide text-on-surface-variant/70"
                                     >
                                         "Sunday"
                                     </span>
                                     <span
-                                        class="mt-0.5 block font-ui-caption text-[10px] text-on-surface-variant/50"
+                                        class="mt-0.5 block font-ui-caption text-[8px] sm:text-[9px] text-on-surface-variant/50"
                                     >
                                         "Oct 2026"
                                     </span>
                                 </div>
                                 <div
-                                    class="relative flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6"
+                                    class="relative flex-1 border-l border-outline-variant/25 pl-3 sm:pl-4"
                                 >
                                     <span
                                         class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"

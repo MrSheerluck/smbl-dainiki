@@ -111,10 +111,72 @@ pub fn start() -> Result<(), JsValue> {
         history_timeout: None,
     }));
 
+    init_theme(&document)?;
     bind_events(&state, &document)?;
     update_labels(&state);
 
     spawn_result(init(state.clone()));
+
+    Ok(())
+}
+
+fn init_theme(document: &Document) -> Result<(), JsValue> {
+    let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
+    let saved = window
+        .local_storage()?
+        .and_then(|storage| storage.get_item("dainiki-theme").ok().flatten());
+
+    let system_dark = window
+        .match_media("(prefers-color-scheme: dark)")?
+        .is_some_and(|query| query.matches());
+
+    let theme = match saved.as_deref() {
+        Some("dark") => "dark",
+        Some("light") => "light",
+        _ if system_dark => "dark",
+        _ => "light",
+    };
+
+    apply_theme(document, theme)
+}
+
+fn apply_theme(document: &Document, theme: &str) -> Result<(), JsValue> {
+    let root = document
+        .document_element()
+        .ok_or_else(|| JsValue::from_str("no document element"))?;
+    root.set_attribute("data-theme", theme)?;
+
+    if let Some(button) = document.query_selector("#theme-toggle")? {
+        let (icon, label) = if theme == "dark" {
+            ("☀", "Switch to light theme")
+        } else {
+            ("☾", "Switch to dark theme")
+        };
+
+        button.set_text_content(Some(icon));
+        button.set_attribute("aria-label", label)?;
+    }
+
+    Ok(())
+}
+
+fn toggle_theme(document: &Document) -> Result<(), JsValue> {
+    let root = document
+        .document_element()
+        .ok_or_else(|| JsValue::from_str("no document element"))?;
+    let current = root
+        .get_attribute("data-theme")
+        .unwrap_or_else(|| "light".to_string());
+    let next = if current == "dark" { "light" } else { "dark" };
+
+    apply_theme(document, next)?;
+
+    if let Some(storage) = web_sys::window()
+        .ok_or_else(|| JsValue::from_str("no window"))?
+        .local_storage()?
+    {
+        storage.set_item("dainiki-theme", next)?;
+    }
 
     Ok(())
 }
@@ -317,6 +379,17 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         "click",
         Closure::<dyn FnMut(Event)>::new(move |_| {
             set_active_tag(clear_state.clone(), None);
+        }),
+    )?;
+
+    let theme_document = document.clone();
+    listen(
+        element(document, "#theme-toggle")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            if let Err(error) = toggle_theme(&theme_document) {
+                web_sys::console::error_1(&error);
+            }
         }),
     )?;
 

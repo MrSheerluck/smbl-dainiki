@@ -45,15 +45,37 @@
   --text-ui-label--letter-spacing: 0.02em;
 }
 
+[data-theme="dark"] {
+  --color-surface: #151312;
+  --color-surface-container-low: #191614;
+  --color-surface-container: #1e1b19;
+  --color-surface-container-high: #2a2522;
+  --color-surface-container-lowest: #201c1a;
+  --color-on-surface: #f2eae6;
+  --color-on-surface-variant: #c9c1ba;
+  --color-primary: #a8cdb6;
+  --color-on-primary: #173123;
+  --color-secondary: #ffb595;
+  --color-outline: #8f958e;
+  --color-outline-variant: #454b45;
+}
+
 @layer base {
   html {
     color-scheme: light;
+  }
+
+  html[data-theme="dark"] {
+    color-scheme: dark;
   }
 
   body {
     margin: 0;
     background: var(--color-surface);
     color: var(--color-on-surface);
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
   }
 }
 

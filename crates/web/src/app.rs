@@ -292,16 +292,26 @@ pub async fn topbar() -> Result<impl View> {
                 "Local · saved"
             </div>
 
-            <button
-                id="open-search"
-                type="button"
-                class="flex w-full max-w-sm items-center gap-3 rounded-full border border-outline-variant/50 bg-surface-container-lowest px-4 py-2 text-left font-ui text-ui-body text-on-surface-variant hover:border-outline"
-            >
-                <span>"Search entries…"</span>
-                <span class="ml-auto rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/80">
-                    "⌘K"
-                </span>
-            </button>
+            <div class="flex min-w-0 items-center gap-2">
+                <button
+                    id="open-search"
+                    type="button"
+                    class="flex w-full max-w-sm items-center gap-3 rounded-full border border-outline-variant/50 bg-surface-container-lowest px-4 py-2 text-left font-ui text-ui-body text-on-surface-variant hover:border-outline"
+                >
+                    <span>"Search entries…"</span>
+                    <span class="ml-auto rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/80">
+                        "⌘K"
+                    </span>
+                </button>
+                <button
+                    id="theme-toggle"
+                    type="button"
+                    aria-label="Switch to dark theme"
+                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-outline-variant/50 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                >
+                    "☾"
+                </button>
+            </div>
         </header>
     })
 }

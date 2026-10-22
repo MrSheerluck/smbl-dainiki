@@ -31,11 +31,11 @@ Open <http://127.0.0.1:3000>.
 
 ## App development
 
-The journal app lives in `crates/web`. Build the WASM parser first, then run the
-Topcoat server from the repo root:
+The journal app lives in `crates/web`. Build the Rust/WASM client first, then
+run the Topcoat server from the repo root:
 
 ```sh
-wasm-pack build crates/wasm --target web --out-dir ../../web/pkg
+wasm-pack build crates/client --target web --out-dir ../../web/client/pkg
 topcoat dev -p dainiki-web
 ```
 
@@ -47,12 +47,12 @@ File System as `journal/YYYY/MM/YYYY-MM-DD.md`.
 The landing page is live. The local-first journal is in development:
 
 - OPFS-backed Markdown entries, one file per day.
-- CodeMirror 6 editor with cursor-aware live preview: active line shows source,
-  inactive lines hide Markdown markers.
+- Rust/WASM client with a native textarea editor and a live Markdown preview pane.
 - Daily editor with previous/next day navigation.
 - Timeline built by scanning the stored files.
 - Live tag counts, clickable tag filters, and a calendar with entry dots.
-- Rust parser compiled to WASM for tags, excerpt, and word count.
+- No npm, no node_modules, and no client framework. The only client JS is the
+  generated wasm-bindgen loader.
 
 Next: local search and themes.
 
@@ -65,7 +65,7 @@ documentation.
 - Rust + [Topcoat](https://github.com/tokio-rs/topcoat)
 - SQLite
 - Tailwind CSS
-- CodeMirror for the Markdown editor
+- Rust/WASM browser client (`web-sys`, `pulldown-cmark`)
 - Cloudflare R2 for encrypted paid sync
 - Dodo Payments for billing
 

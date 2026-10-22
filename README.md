@@ -56,10 +56,12 @@ The landing page is live. The local-first journal is in development:
 - Light/dark theme with a persisted preference and system default.
 - Conflict copies when a file changes outside the app; local edits are preserved.
 - Click any past entry to edit it in place; today's editor stays at the top.
+- Export the journal as a Markdown zip; import zip, Markdown files, or a folder
+  with conflict-safe date merging.
 - No npm, no node_modules, and no client framework. The only client JS is the
   generated wasm-bindgen loader.
 
-Next: import/export and PWA installability.
+Next: PWA installability and offline shell.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root

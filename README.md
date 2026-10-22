@@ -44,7 +44,8 @@ File System as `journal/YYYY/MM/YYYY-MM-DD.md`.
 
 ## Status
 
-The landing page is live. The local-first journal is in development:
+The landing page is live. The local-first journal MVP is complete and awaiting
+manual sign-off:
 
 - OPFS-backed Markdown entries, one file per day.
 - Rust/WASM client with a cursor-aware live preview editor: the active line
@@ -62,8 +63,11 @@ The landing page is live. The local-first journal is in development:
   wasm-bindgen loader and the browser-mandated service worker.
 - Installable PWA with an offline app shell.
 - Incremental timeline pagination and a mobile sidebar drawer.
+- First-run onboarding with a persistent-storage request.
+- Ten local end-to-end browser tests covering storage, editing, search, themes,
+  conflicts, import/export, offline mode, and mobile.
 
-Next: local end-to-end tests and final hardening.
+Next: accounts and auth, then encrypted sync and billing.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root

@@ -1,3 +1,5 @@
+use crate::typography::{INTER, NEWSREADER};
+
 use topcoat::{
     Result,
     router::{Slot, layout},
@@ -14,6 +16,8 @@ pub async fn root(slot: Slot<'_>) -> Result<impl View> {
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <meta name="theme-color" content="#fef8f6">
                 <title>"Dainiki"</title>
+                topcoat::font::link(font: INTER)
+                topcoat::font::link(font: NEWSREADER)
                 <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())>
                 topcoat::dev::script()
             </head>

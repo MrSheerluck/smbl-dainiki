@@ -1,8 +1,36 @@
 use topcoat::{
     Result,
     router::page,
-    view::{View, component, view},
+    view::{View, class, component, view},
 };
+
+struct Tag {
+    name: &'static str,
+    count: &'static str,
+}
+
+const TAGS: &[Tag] = &[
+    Tag {
+        name: "reflections",
+        count: "42",
+    },
+    Tag {
+        name: "travel",
+        count: "18",
+    },
+    Tag {
+        name: "morning",
+        count: "64",
+    },
+    Tag {
+        name: "work",
+        count: "31",
+    },
+    Tag {
+        name: "ideas",
+        count: "15",
+    },
+];
 
 #[page("/")]
 pub async fn timeline() -> Result<impl View> {
@@ -11,22 +39,10 @@ pub async fn timeline() -> Result<impl View> {
             sidebar()
             <div class="flex min-w-0 flex-1 flex-col">
                 topbar()
-                <main class="flex-1 px-6 py-12 lg:px-10">
-                    <div class="mx-auto max-w-3xl">
-                        <p class="font-ui text-ui-label uppercase tracking-[0.16em] text-on-surface-variant">
-                            "Thursday, October 22"
-                        </p>
-                        <h1 class="mt-3 font-display text-headline-lg text-on-surface">
-                            "The journal starts here."
-                        </h1>
-                        <p class="mt-4 max-w-xl font-journal text-journal-lg leading-relaxed text-on-surface-variant">
-                            "The shell is in place. The timeline, editor, tags, calendar, and search arrive in the next lessons."
-                        </p>
-                        <div class="mt-10 rounded-sm border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-12 text-center">
-                            <p class="font-ui text-ui-body text-on-surface-variant">
-                                "Timeline and editor land here next."
-                            </p>
-                        </div>
+                <main class="flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:px-10">
+                    <div class="mx-auto space-y-8">
+                        today_entry()
+                        older_entry()
                     </div>
                 </main>
             </div>
@@ -35,72 +51,259 @@ pub async fn timeline() -> Result<impl View> {
 }
 
 #[component]
+pub async fn date_column(day: &str, weekday: &str, month: &str) -> Result<impl View> {
+    Ok(view! {
+        <div class="w-14 shrink-0 pt-1 text-right">
+            <span class="block font-display text-[1.9rem] leading-none text-on-surface/70 sm:text-[2.2rem]">
+                (day)
+            </span>
+            <span class="mt-1 block whitespace-nowrap font-ui text-[8px] uppercase tracking-wide text-on-surface-variant/70 sm:text-[9px]">
+                (weekday)
+            </span>
+            <span class="mt-0.5 block font-ui text-[8px] text-on-surface-variant/50 sm:text-[9px]">
+                (month)
+            </span>
+        </div>
+    })
+}
+
+#[component]
+pub async fn today_entry() -> Result<impl View> {
+    Ok(view! {
+        <article class="flex gap-3 sm:gap-5">
+            date_column(day: "22", weekday: "Today", month: "Oct 2026")
+            <div class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6">
+                <span class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"></span>
+                <div class="rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm sm:p-6">
+                    <h1 class="font-display text-headline-md tracking-tight text-on-surface">
+                        "The slow return of morning fog"
+                    </h1>
+                    <p class="mt-1 font-journal text-journal italic text-on-surface-variant">
+                        "Before the sun cleared the ridgeline…"
+                    </p>
+
+                    <div class="mt-5 space-y-4 font-journal text-journal text-on-surface">
+                        <p>
+                            "Before the sun cleared the ridgeline, the entire gorge lay suspended under a pale river vapor. Walking the bamboo path at this hour is an exercise in acoustic subtraction: only the steady, hollow knocking of towering culms overhead."
+                        </p>
+                        <blockquote class="border-l-2 border-secondary/40 py-1 pl-4 font-journal text-journal-lg italic text-on-surface-variant">
+                            "The day did not ask to be optimized. It asked to be noticed."
+                        </blockquote>
+                        <p>
+                            "I stopped for roasted tea by the hearth, grateful for an unhurried morning. A few lines before the inbox opens. A small record of what the light was doing, and what I was thinking while it did it."
+                        </p>
+                    </div>
+
+                    <div class="mt-5 flex flex-wrap items-center gap-3">
+                        tag_label(label: "#morning")
+                        tag_label(label: "#reflections")
+                    </div>
+                </div>
+            </div>
+        </article>
+    })
+}
+
+#[component]
+pub async fn older_entry() -> Result<impl View> {
+    Ok(view! {
+        <article class="flex gap-3 sm:gap-5">
+            date_column(day: "21", weekday: "Wednesday", month: "Oct 2026")
+            <div class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6">
+                <span class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"></span>
+                <div class="rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm sm:p-6">
+                    <h2 class="font-display text-headline-md tracking-tight text-on-surface">
+                        "A shorter walk than planned"
+                    </h2>
+                    <p class="mt-3 font-journal text-journal text-on-surface">
+                        "The path was muddy from the night's rain, so I turned back early and watched the river from the bridge instead. A small detour, but the right one."
+                    </p>
+                    <div class="mt-5 flex flex-wrap items-center gap-3">
+                        tag_label(label: "#work")
+                    </div>
+                </div>
+            </div>
+        </article>
+    })
+}
+
+#[component]
+pub async fn tag_label(label: &str) -> Result<impl View> {
+    Ok(view! {
+        <span class="font-mono text-ui-label text-secondary/70">(label)</span>
+    })
+}
+
+#[component]
 pub async fn sidebar() -> Result<impl View> {
     Ok(view! {
-        <aside class="hidden w-64 shrink-0 flex-col border-r border-outline-variant/70 bg-surface-container-low px-4 py-6 lg:flex">
-            <div class="flex items-center gap-3 px-2">
-                <div class="flex h-9 w-9 items-center justify-center rounded-sm bg-primary font-display text-lg text-on-primary">
-                    "D"
+        <aside class="hidden w-[230px] shrink-0 flex-col border-r border-outline-variant/40 bg-surface-container-low/70 lg:flex">
+            <div class="flex-1 overflow-y-auto px-3 py-5">
+                <div class="flex items-center gap-3 px-2">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-sm bg-primary font-display text-lg text-on-primary">
+                        "D"
+                    </div>
+                    <div>
+                        <p class="font-ui text-sm font-semibold leading-none tracking-tight text-on-surface">
+                            "Dainiki"
+                        </p>
+                        <p class="mt-1 font-ui text-[9px] uppercase tracking-[0.14em] text-on-surface-variant">
+                            "A quiet journal"
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <p class="font-display text-xl leading-none text-on-surface">
-                        "Dainiki"
-                    </p>
-                    <p class="mt-1 font-ui text-ui-label uppercase tracking-[0.14em] text-on-surface-variant">
-                        "A quiet journal"
-                    </p>
-                </div>
-            </div>
 
-            <nav class="mt-10 space-y-1">
-                <a
-                    href="/"
-                    class="flex items-center justify-between rounded-sm bg-surface-container px-3 py-2 font-ui text-ui-body text-on-surface"
-                >
-                    <span>"Timeline"</span>
-                    <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
-                </a>
-                <button
-                    type="button"
-                    class="flex w-full items-center justify-between rounded-sm px-3 py-2 text-left font-ui text-ui-body text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
-                >
-                    <span>"Search"</span>
-                    <span class="font-ui text-ui-label text-on-surface-variant">
-                        "⌘K"
-                    </span>
-                </button>
-            </nav>
+                <nav class="mt-8 space-y-0.5">
+                    <a
+                        href="/"
+                        class="flex items-center justify-between rounded bg-surface-container-high px-2 py-1.5 font-ui text-ui-label font-medium text-on-surface"
+                    >
+                        <span class="flex items-center gap-2">
+                            <svg
+                                aria-hidden="true"
+                                class="h-4 w-4 text-primary"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                            >
+                                <path d="M4 6h16"></path>
+                                <path d="M4 12h16"></path>
+                                <path d="M4 18h16"></path>
+                            </svg>
+                            <span>"Timeline"</span>
+                        </span>
+                        <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+                    </a>
+                    <button
+                        type="button"
+                        class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left font-ui text-ui-label text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                    >
+                        <span class="flex items-center gap-2">
+                            <svg
+                                aria-hidden="true"
+                                class="h-4 w-4"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.7"
+                                stroke-linecap="round"
+                            >
+                                <circle cx="11" cy="11" r="6"></circle>
+                                <path d="m16 16 4 4"></path>
+                            </svg>
+                            <span>"Search"</span>
+                        </span>
+                        <span class="rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/80">
+                            "⌘K"
+                        </span>
+                    </button>
+                </nav>
 
-            <div class="mt-8">
-                <h2 class="px-3 font-ui text-ui-label uppercase tracking-[0.14em] text-on-surface-variant">
-                    "Tags"
-                </h2>
-                <div class="mt-2 space-y-0.5">
-                    for tag in ["#morning", "#reflections", "#work", "#ideas"] {
+                <div class="mt-7">
+                    <div class="flex items-center justify-between px-2 pb-1">
+                        <h2 class="font-ui text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant/80">
+                            "Tags"
+                        </h2>
                         <button
                             type="button"
-                            class="flex w-full items-center justify-between rounded-sm px-3 py-1.5 text-left font-ui text-ui-body text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                            class="font-ui text-ui-label text-on-surface-variant/70 hover:text-on-surface"
                         >
-                            <span>(tag)</span>
-                            <span class="font-ui text-ui-label text-on-surface-variant/70">
-                                "·"
-                            </span>
+                            "+"
                         </button>
-                    }
+                    </div>
+                    <div class="space-y-0.5">
+                        for tag in TAGS {
+                            <button
+                                type="button"
+                                class="flex w-full items-center justify-between rounded px-2 py-1 text-left font-ui text-ui-label text-on-surface-variant transition-colors hover:bg-surface-container-high"
+                            >
+                                <span class="flex items-center gap-1.5">
+                                    <span class="font-mono text-secondary/70">"#"</span>
+                                    (tag.name)
+                                </span>
+                                <span class="font-ui text-[10px] text-on-surface-variant/60">
+                                    (tag.count)
+                                </span>
+                            </button>
+                        }
+                    </div>
                 </div>
             </div>
 
-            <div class="mt-auto border-t border-outline-variant/60 pt-4">
-                <button
-                    type="button"
-                    class="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left font-ui text-ui-body text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
-                >
-                    <span aria-hidden="true">"⚙"</span>
-                    <span>"Settings"</span>
-                </button>
-                <p class="px-3 pt-3 font-ui text-ui-label text-on-surface-variant/70">
-                    "Saved on this device"
-                </p>
+            <div class="space-y-3 border-t border-outline-variant/40 p-3">
+                <div class="rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2 py-2 shadow-sm">
+                    <div class="flex items-center justify-between px-1 pb-1">
+                        <span class="font-ui text-[10px] font-semibold text-on-surface">
+                            "October 2026"
+                        </span>
+                        <div class="flex items-center gap-1 text-on-surface-variant">
+                            <span class="text-xs leading-none">"‹"</span>
+                            <span class="text-xs leading-none">"›"</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center font-ui text-[9px] text-on-surface-variant">
+                        <span>"M"</span>
+                        <span>"T"</span>
+                        <span>"W"</span>
+                        <span>"T"</span>
+                        <span>"F"</span>
+                        <span>"S"</span>
+                        <span>"S"</span>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 pt-1 text-center font-ui text-[10px]">
+                        <span class="text-on-surface-variant/30">"28"</span>
+                        <span class="text-on-surface-variant/30">"29"</span>
+                        <span class="text-on-surface-variant/30">"30"</span>
+                        for day in 1..=31u8 {
+                            <span
+                                class=(class!(
+                                    "text-on-surface-variant" if day != 22,
+                                    "font-semibold text-primary relative after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-primary" if day == 22,
+                                ))
+                            >
+                                (day)
+                            </span>
+                        }
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between px-1">
+                    <button
+                        type="button"
+                        class="flex items-center gap-2 font-ui text-ui-label text-on-surface-variant hover:text-on-surface"
+                    >
+                        <svg
+                            aria-hidden="true"
+                            class="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                        >
+                            <path d="M4 6h9"></path>
+                            <path d="M17 6h3"></path>
+                            <circle cx="15" cy="6" r="2"></circle>
+                            <path d="M4 12h3"></path>
+                            <path d="M11 12h9"></path>
+                            <circle cx="9" cy="12" r="2"></circle>
+                            <path d="M4 18h9"></path>
+                            <path d="M17 18h3"></path>
+                            <circle cx="15" cy="18" r="2"></circle>
+                        </svg>
+                        <span>"Settings"</span>
+                    </button>
+                    <span class="rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/70">
+                        "⌘,"
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-1.5 px-1 text-on-surface-variant/60">
+                    <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+                    <span class="font-ui text-[10px]">"Stored on this device"</span>
+                </div>
             </div>
         </aside>
     })
@@ -109,21 +312,21 @@ pub async fn sidebar() -> Result<impl View> {
 #[component]
 pub async fn topbar() -> Result<impl View> {
     Ok(view! {
-        <header class="flex h-16 items-center justify-between gap-4 border-b border-outline-variant/70 px-6">
+        <header class="flex h-16 items-center justify-between gap-4 border-b border-outline-variant/40 px-6">
+            <div class="flex shrink-0 items-center gap-2 font-ui text-ui-label text-on-surface-variant/70">
+                <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+                "Local · saved"
+            </div>
+
             <button
                 type="button"
-                class="flex min-w-0 max-w-md flex-1 items-center gap-3 rounded-sm border border-outline-variant/70 bg-surface-container-lowest px-3 py-2 text-left font-ui text-ui-body text-on-surface-variant hover:border-outline"
+                class="flex w-full max-w-sm items-center gap-3 rounded-full border border-outline-variant/50 bg-surface-container-lowest px-4 py-2 text-left font-ui text-ui-body text-on-surface-variant hover:border-outline"
             >
                 <span>"Search entries…"</span>
-                <span class="ml-auto font-ui text-ui-label text-on-surface-variant/70">
+                <span class="ml-auto rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/80">
                     "⌘K"
                 </span>
             </button>
-
-            <div class="flex shrink-0 items-center gap-2 font-ui text-ui-label text-on-surface-variant">
-                <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
-                "Local mode"
-            </div>
         </header>
     })
 }

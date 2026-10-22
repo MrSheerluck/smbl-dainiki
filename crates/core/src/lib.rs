@@ -1,4 +1,6 @@
-use time::{Date, Month, Weekday, macros::format_description};
+use time::{Month, Weekday, macros::format_description};
+
+pub use time::Date;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntryMeta {

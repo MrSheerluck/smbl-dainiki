@@ -1,4 +1,4 @@
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/wasm", "crates/web"]
+members = ["crates/client", "crates/core", "crates/web"]
 exclude = ["landing"]

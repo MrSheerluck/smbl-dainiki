@@ -21,13 +21,8 @@
 # Wrangler local cache
 .wrangler/
 
-# Frontend dependencies/build output
-node_modules/
-/web/node_modules/
-/web/dist/
-/web/.vite/
-/web/editor/node_modules/
-/web/editor/dist/
+# Generated WASM client output
+/web/client/pkg/
 
 # OS / editor
 .DS_Store

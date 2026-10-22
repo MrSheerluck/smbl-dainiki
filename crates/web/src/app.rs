@@ -90,10 +90,17 @@ pub async fn today_entry() -> Result<impl View> {
                         </button>
                     </div>
 
-                    <div
-                        id="entry-editor"
-                        class="min-h-[22rem] w-full"
-                    ></div>
+                    <div class="grid gap-6 lg:grid-cols-2">
+                        <textarea
+                            id="entry-editor"
+                            class="min-h-[22rem] w-full resize-none border-0 bg-transparent font-journal text-journal text-on-surface outline-none placeholder:text-on-surface-variant/40"
+                            placeholder="Write an entry…"
+                            spellcheck="true"
+                        ></textarea>
+                        <div class="min-h-[22rem] border-t border-outline-variant/30 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                            <div id="entry-preview" class="entry-preview"></div>
+                        </div>
+                    </div>
 
                     <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/30 pt-3">
                         <div

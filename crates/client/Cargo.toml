@@ -1,0 +1,43 @@
+[package]
+name = "dainiki-client"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Browser client for Dainiki"
+license = "MIT"
+repository = "https://github.com/MrSheerluck/smbl-dainiki"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+dainiki-core = { path = "../core" }
+ammonia = "4"
+console_error_panic_hook = "0.1"
+gloo-timers = "0.3"
+js-sys = "0.3"
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+time = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = [
+    "Blob",
+    "Document",
+    "Element",
+    "Event",
+    "EventTarget",
+    "File",
+    "FileSystemDirectoryHandle",
+    "FileSystemFileHandle",
+    "FileSystemGetDirectoryOptions",
+    "FileSystemGetFileOptions",
+    "FileSystemHandle",
+    "FileSystemHandleKind",
+    "FileSystemWritableFileStream",
+    "HtmlTextAreaElement",
+    "Navigator",
+    "StorageManager",
+    "Window",
+    "WritableStream",
+    "console",
+] }

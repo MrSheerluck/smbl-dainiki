@@ -13,7 +13,7 @@ async fn main() {
     let router = Router::builder()
         .layout(layout::root)
         .page(app::timeline)
-        .serve_dir("/client/{*file}", "web/client")
+        .public_dir("web/client")
         .assets(AssetBundle::load().unwrap())
         .font(typography::INTER)
         .font(typography::NEWSREADER)

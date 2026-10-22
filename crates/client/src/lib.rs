@@ -148,8 +148,17 @@ pub fn start() -> Result<(), JsValue> {
     bind_events(&state, &document)?;
     update_labels(&state);
 
+    spawn_result(register_service_worker());
     spawn_result(init(state.clone()));
 
+    Ok(())
+}
+
+async fn register_service_worker() -> Result<(), JsValue> {
+    let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
+    let container = window.navigator().service_worker();
+
+    JsFuture::from(container.register("/sw.js")).await?;
     Ok(())
 }
 

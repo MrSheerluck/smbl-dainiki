@@ -16,6 +16,8 @@ pub async fn root(slot: Slot<'_>) -> Result<impl View> {
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <meta name="theme-color" content="#fef8f6">
                 <title>"Dainiki"</title>
+                <link rel="manifest" href="/manifest.webmanifest">
+                <link rel="apple-touch-icon" href="/icon-192.png">
                 topcoat::font::link(font: INTER)
                 topcoat::font::link(font: NEWSREADER)
                 <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())>
@@ -23,7 +25,7 @@ pub async fn root(slot: Slot<'_>) -> Result<impl View> {
             </head>
             <body class="bg-surface font-ui text-ui-body text-on-surface antialiased">
                 (slot)
-                <script type="module" src="/client/loader.js"></script>
+                <script type="module" src="/loader.js"></script>
             </body>
         </html>
     })

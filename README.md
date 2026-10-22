@@ -53,10 +53,11 @@ The landing page is live. The local-first journal is in development:
 - Timeline built by scanning the stored files.
 - Live tag counts, clickable tag filters, and a calendar with entry dots.
 - Local full-text search with `⌘K`, tag matching, snippets, and keyboard navigation.
+- Light/dark theme with a persisted preference and system default.
 - No npm, no node_modules, and no client framework. The only client JS is the
   generated wasm-bindgen loader.
 
-Next: local search and themes.
+Next: conflict copies and import/export.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root

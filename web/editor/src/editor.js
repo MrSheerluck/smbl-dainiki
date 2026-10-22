@@ -7,7 +7,7 @@ import {
   placeholder,
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { livePreview } from "./live-preview.js";
 
 const theme = EditorView.theme({
@@ -126,7 +126,7 @@ export function createEditor(parent, onChange) {
       drawSelection(),
       dropCursor(),
       EditorView.lineWrapping,
-      markdown(),
+      markdown({ base: markdownLanguage }),
       livePreview,
       theme,
       placeholder("Write an entry…"),

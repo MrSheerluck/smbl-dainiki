@@ -47,11 +47,13 @@ File System as `journal/YYYY/MM/YYYY-MM-DD.md`.
 The landing page is live. The local-first journal is in development:
 
 - OPFS-backed Markdown entries, one file per day.
+- CodeMirror 6 editor with cursor-aware live preview: active line shows source,
+  inactive lines hide Markdown markers.
 - Daily editor with previous/next day navigation.
 - Timeline built by scanning the stored files.
 - Rust parser compiled to WASM for tags, excerpt, and word count.
 
-Next: the CodeMirror live-preview editor and richer Markdown rendering.
+Next: live tag filtering, calendar wiring, and search.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root

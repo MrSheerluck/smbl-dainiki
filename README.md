@@ -58,10 +58,11 @@ The landing page is live. The local-first journal is in development:
 - Click any past entry to edit it in place; today's editor stays at the top.
 - Export the journal as a Markdown zip; import zip, Markdown files, or a folder
   with conflict-safe date merging.
-- No npm, no node_modules, and no client framework. The only client JS is the
-  generated wasm-bindgen loader.
+- No npm, no node_modules, and no client framework. The only JS is the generated
+  wasm-bindgen loader and the browser-mandated service worker.
+- Installable PWA with an offline app shell.
 
-Next: PWA installability and offline shell.
+Next: timeline pagination and mobile polish.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root

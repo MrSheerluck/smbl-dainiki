@@ -55,6 +55,7 @@ The landing page is live. The local-first journal is in development:
 - Local full-text search with `⌘K`, tag matching, snippets, and keyboard navigation.
 - Light/dark theme with a persisted preference and system default.
 - Conflict copies when a file changes outside the app; local edits are preserved.
+- Click any past entry to edit it in place; today's editor stays at the top.
 - No npm, no node_modules, and no client framework. The only client JS is the
   generated wasm-bindgen loader.
 

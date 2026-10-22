@@ -7,7 +7,12 @@ import {
 const editorHost = document.querySelector("#entry-editor");
 const status = document.querySelector("#entry-status");
 const tagList = document.querySelector("#entry-tags");
+const sidebarTagList = document.querySelector("#tag-list");
 const timeline = document.querySelector("#timeline-entries");
+const activeFilter = document.querySelector("#active-filter");
+const activeFilterLabel = document.querySelector("#active-filter-label");
+const clearFilterButton = document.querySelector("#clear-filter");
+const calendar = document.querySelector("#calendar");
 const todayButton = document.querySelector("#today-button");
 const prevDayButton = document.querySelector("#prev-day");
 const nextDayButton = document.querySelector("#next-day");
@@ -17,6 +22,9 @@ const monthLabel = document.querySelector("#today-month");
 
 const todayIso = isoFor(new Date());
 let selectedIso = todayIso;
+let calendarMonth = monthStart(selectedIso);
+let allEntries = [];
+let activeTag = null;
 let wasm = null;
 let currentFile = null;
 let saveTimer = null;
@@ -30,6 +38,11 @@ function isoFor(date) {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function monthStart(iso) {
+  const [year, month] = iso.split("-").map(Number);
+  return new Date(year, month - 1, 1, 12);
 }
 
 function dateInfo(iso) {
@@ -280,20 +293,217 @@ function renderEntry(entry) {
   return article;
 }
 
+function renderTagList(entries) {
+  if (!sidebarTagList) return;
+
+  const counts = new Map();
+
+  for (const entry of entries) {
+    for (const tag of entry.meta.tags) {
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  if (activeTag && !counts.has(activeTag)) {
+    activeTag = null;
+  }
+
+  const tags = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 8);
+
+  if (tags.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "px-2 py-1 font-ui text-[10px] text-on-surface-variant/50";
+    empty.textContent = "No tags yet.";
+    sidebarTagList.replaceChildren(empty);
+  } else {
+    sidebarTagList.replaceChildren(
+      ...tags.map(([tag, count]) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className =
+          activeTag === tag
+            ? "flex w-full items-center justify-between rounded bg-surface-container-high px-2 py-1 text-left font-ui text-ui-label text-on-surface"
+            : "flex w-full items-center justify-between rounded px-2 py-1 text-left font-ui text-ui-label text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface";
+
+        button.addEventListener("click", () => {
+          setActiveTag(activeTag === tag ? null : tag);
+        });
+
+        const label = document.createElement("span");
+        label.className = "flex items-center gap-1.5";
+
+        const hash = document.createElement("span");
+        hash.className = "font-mono text-secondary/70";
+        hash.textContent = "#";
+
+        const name = document.createElement("span");
+        name.textContent = tag;
+
+        label.append(hash, name);
+
+        const countLabel = document.createElement("span");
+        countLabel.className = "font-ui text-[10px] text-on-surface-variant/60";
+        countLabel.textContent = String(count);
+
+        button.append(label, countLabel);
+        return button;
+      })
+    );
+  }
+
+  if (activeFilter) activeFilter.hidden = !activeTag;
+  if (activeFilterLabel) {
+    activeFilterLabel.textContent = activeTag ? `#${activeTag}` : "";
+  }
+}
+
+function setActiveTag(tag) {
+  activeTag = tag;
+  renderTagList(allEntries);
+  renderTimeline(allEntries);
+
+  if (tag) {
+    timeline?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function renderCalendar(entries) {
+  if (!calendar) return;
+
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const entrySet = new Set(entries.map((entry) => entry.iso));
+
+  const header = document.createElement("div");
+  header.className = "flex items-center justify-between px-1 pb-1";
+
+  const label = document.createElement("span");
+  label.className = "font-ui text-[10px] font-semibold text-on-surface";
+  label.textContent = calendarMonth.toLocaleDateString("en", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const controls = document.createElement("div");
+  controls.className = "flex items-center gap-1 text-on-surface-variant";
+
+  const previous = document.createElement("button");
+  previous.type = "button";
+  previous.className = "px-1 text-xs leading-none hover:text-on-surface";
+  previous.setAttribute("aria-label", "Previous month");
+  previous.textContent = "‹";
+  previous.addEventListener("click", () => {
+    calendarMonth = new Date(year, month - 1, 1, 12);
+    renderCalendar(allEntries);
+  });
+
+  const next = document.createElement("button");
+  next.type = "button";
+  next.className = "px-1 text-xs leading-none hover:text-on-surface";
+  next.setAttribute("aria-label", "Next month");
+  next.textContent = "›";
+  next.addEventListener("click", () => {
+    calendarMonth = new Date(year, month + 1, 1, 12);
+    renderCalendar(allEntries);
+  });
+
+  controls.append(previous, next);
+  header.append(label, controls);
+
+  const weekdays = document.createElement("div");
+  weekdays.className =
+    "grid grid-cols-7 gap-1 text-center font-ui text-[9px] text-on-surface-variant";
+
+  for (const day of ["M", "T", "W", "T", "F", "S", "S"]) {
+    const cell = document.createElement("span");
+    cell.textContent = day;
+    weekdays.append(cell);
+  }
+
+  const grid = document.createElement("div");
+  grid.className =
+    "grid grid-cols-7 gap-1 pt-1 text-center font-ui text-[10px]";
+
+  const first = new Date(year, month, 1, 12);
+  const offset = (first.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0, 12).getDate();
+
+  for (let blank = 0; blank < offset; blank += 1) {
+    grid.append(document.createElement("span"));
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const isFuture = iso > todayIso;
+    const isSelected = iso === selectedIso;
+    const hasEntry = entrySet.has(iso);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = String(day);
+    button.setAttribute("aria-label", iso);
+    button.setAttribute("aria-pressed", String(isSelected));
+
+    const classes = [
+      "relative flex h-6 w-6 items-center justify-center rounded transition-colors",
+    ];
+
+    if (isFuture) {
+      classes.push("cursor-default text-on-surface-variant/25");
+      button.disabled = true;
+    } else if (isSelected) {
+      classes.push("bg-primary text-on-primary hover:bg-primary");
+    } else {
+      classes.push("text-on-surface-variant hover:bg-surface-container");
+      if (iso === todayIso) classes.push("font-semibold text-primary");
+    }
+
+    if (hasEntry && !isSelected) {
+      classes.push(
+        "after:absolute after:bottom-0.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-primary"
+      );
+    }
+
+    button.className = classes.join(" ");
+
+    if (!isFuture) {
+      button.addEventListener("click", () => {
+        void selectDate(iso);
+      });
+    }
+
+    grid.append(button);
+  }
+
+  calendar.replaceChildren(header, weekdays, grid);
+}
+
 function renderTimeline(entries) {
   if (!timeline) return;
 
-  const visible = entries.filter((entry) => entry.iso !== selectedIso);
+  const visible = entries.filter(
+    (entry) =>
+      entry.iso !== selectedIso &&
+      (!activeTag || entry.meta.tags.includes(activeTag))
+  );
 
   if (visible.length === 0) {
     const empty = document.createElement("p");
     empty.className = "font-ui text-ui-label text-on-surface-variant/60";
-    empty.textContent = "No older entries yet.";
+    empty.textContent = activeTag
+      ? `No entries tagged #${activeTag}.`
+      : "No older entries yet.";
     timeline.replaceChildren(empty);
-    return;
+  } else {
+    timeline.replaceChildren(...visible.map(renderEntry));
   }
 
-  timeline.replaceChildren(...visible.map(renderEntry));
+  if (activeFilter) activeFilter.hidden = !activeTag;
+  if (activeFilterLabel) {
+    activeFilterLabel.textContent = activeTag ? `#${activeTag}` : "";
+  }
 }
 
 async function listEntries() {
@@ -349,7 +559,10 @@ async function listEntries() {
 
 async function refreshTimeline() {
   const entries = await listEntries();
+  allEntries = entries;
+  renderTagList(entries);
   renderTimeline(entries);
+  renderCalendar(entries);
 }
 
 function shiftDate(days) {
@@ -366,6 +579,7 @@ async function selectDate(iso) {
 
   await saveEntry();
   selectedIso = iso;
+  calendarMonth = monthStart(iso);
   updateDateLabels(iso);
   await loadEntry(iso);
   await refreshTimeline();
@@ -396,6 +610,10 @@ async function main() {
 
   todayButton?.addEventListener("click", () => {
     void selectDate(todayIso);
+  });
+
+  clearFilterButton?.addEventListener("click", () => {
+    setActiveTag(null);
   });
 
   prevDayButton?.addEventListener("click", () => {

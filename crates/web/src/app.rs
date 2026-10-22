@@ -1,47 +1,32 @@
 use topcoat::{
     Result,
     router::page,
-    view::{View, class, component, view},
+    view::{View, component, view},
 };
-
-struct Tag {
-    name: &'static str,
-    count: &'static str,
-}
-
-const TAGS: &[Tag] = &[
-    Tag {
-        name: "reflections",
-        count: "42",
-    },
-    Tag {
-        name: "travel",
-        count: "18",
-    },
-    Tag {
-        name: "morning",
-        count: "64",
-    },
-    Tag {
-        name: "work",
-        count: "31",
-    },
-    Tag {
-        name: "ideas",
-        count: "15",
-    },
-];
 
 #[page("/")]
 pub async fn timeline() -> Result<impl View> {
     Ok(view! {
-        <div class="flex min-h-screen bg-surface">
+        <div class="flex min-h-screen bg-surface lg:h-screen lg:overflow-hidden">
             sidebar()
-            <div class="flex min-w-0 flex-1 flex-col">
+            <div class="flex min-w-0 flex-1 flex-col lg:min-h-0">
                 topbar()
-                <main class="flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:px-10">
+                <main class="flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:min-h-0 lg:overflow-y-auto lg:px-10">
                     <div class="mx-auto space-y-8">
                         today_entry()
+                        <div id="active-filter" hidden="true" class="flex items-center gap-2">
+                            <span class="font-ui text-ui-label text-on-surface-variant/60">
+                                "Filtered by"
+                            </span>
+                            <button
+                                id="clear-filter"
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-full bg-surface-container-high px-3 py-1 font-mono text-ui-label text-on-surface hover:bg-surface-container"
+                            >
+                                <span id="active-filter-label">"#tag"</span>
+                                <span aria-hidden="true">"×"</span>
+                            </button>
+                        </div>
                         <div id="timeline-entries" class="space-y-8"></div>
                     </div>
                 </main>
@@ -131,8 +116,8 @@ pub async fn today_entry() -> Result<impl View> {
 #[component]
 pub async fn sidebar() -> Result<impl View> {
     Ok(view! {
-        <aside class="hidden w-[230px] shrink-0 flex-col border-r border-outline-variant/40 bg-surface-container-low/70 lg:flex">
-            <div class="flex-1 overflow-y-auto px-3 py-5">
+        <aside class="hidden h-screen w-[230px] shrink-0 flex-col border-r border-outline-variant/40 bg-surface-container-low/70 lg:flex">
+            <div class="min-h-0 flex-1 overflow-hidden px-3 py-4">
                 <div class="flex items-center gap-3 px-2">
                     <div class="flex h-9 w-9 items-center justify-center rounded-sm bg-primary font-display text-lg text-on-primary">
                         "D"
@@ -147,7 +132,7 @@ pub async fn sidebar() -> Result<impl View> {
                     </div>
                 </div>
 
-                <nav class="mt-8 space-y-0.5">
+                <nav class="mt-6 space-y-0.5">
                     <a
                         href="/"
                         class="flex items-center justify-between rounded bg-surface-container-high px-2 py-1.5 font-ui text-ui-label font-medium text-on-surface"
@@ -195,7 +180,7 @@ pub async fn sidebar() -> Result<impl View> {
                     </button>
                 </nav>
 
-                <div class="mt-7">
+                <div class="mt-6">
                     <div class="flex items-center justify-between px-2 pb-1">
                         <h2 class="font-ui text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant/80">
                             "Tags"
@@ -207,60 +192,22 @@ pub async fn sidebar() -> Result<impl View> {
                             "+"
                         </button>
                     </div>
-                    <div class="space-y-0.5">
-                        for tag in TAGS {
-                            <button
-                                type="button"
-                                class="flex w-full items-center justify-between rounded px-2 py-1 text-left font-ui text-ui-label text-on-surface-variant transition-colors hover:bg-surface-container-high"
-                            >
-                                <span class="flex items-center gap-1.5">
-                                    <span class="font-mono text-secondary/70">"#"</span>
-                                    (tag.name)
-                                </span>
-                                <span class="font-ui text-[10px] text-on-surface-variant/60">
-                                    (tag.count)
-                                </span>
-                            </button>
-                        }
+                    <div id="tag-list" class="space-y-0.5">
+                        <p class="px-2 py-1 font-ui text-[10px] text-on-surface-variant/50">
+                            "Loading…"
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <div class="space-y-3 border-t border-outline-variant/40 p-3">
-                <div class="rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2 py-2 shadow-sm">
-                    <div class="flex items-center justify-between px-1 pb-1">
-                        <span class="font-ui text-[10px] font-semibold text-on-surface">
-                            "October 2026"
-                        </span>
-                        <div class="flex items-center gap-1 text-on-surface-variant">
-                            <span class="text-xs leading-none">"‹"</span>
-                            <span class="text-xs leading-none">"›"</span>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-7 gap-1 text-center font-ui text-[9px] text-on-surface-variant">
-                        <span>"M"</span>
-                        <span>"T"</span>
-                        <span>"W"</span>
-                        <span>"T"</span>
-                        <span>"F"</span>
-                        <span>"S"</span>
-                        <span>"S"</span>
-                    </div>
-                    <div class="grid grid-cols-7 gap-1 pt-1 text-center font-ui text-[10px]">
-                        <span class="text-on-surface-variant/30">"28"</span>
-                        <span class="text-on-surface-variant/30">"29"</span>
-                        <span class="text-on-surface-variant/30">"30"</span>
-                        for day in 1..=31u8 {
-                            <span
-                                class=(class!(
-                                    "text-on-surface-variant" if day != 22,
-                                    "font-semibold text-primary relative after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-primary" if day == 22,
-                                ))
-                            >
-                                (day)
-                            </span>
-                        }
-                    </div>
+            <div class="shrink-0 space-y-3 border-t border-outline-variant/40 p-3">
+                <div
+                    id="calendar"
+                    class="rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2 py-2 shadow-sm"
+                >
+                    <p class="px-1 py-1 font-ui text-[10px] text-on-surface-variant/50">
+                        "Loading…"
+                    </p>
                 </div>
 
                 <div class="flex items-center justify-between px-1">
@@ -306,7 +253,7 @@ pub async fn sidebar() -> Result<impl View> {
 #[component]
 pub async fn topbar() -> Result<impl View> {
     Ok(view! {
-        <header class="flex h-16 items-center justify-between gap-4 border-b border-outline-variant/40 px-6">
+        <header class="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-outline-variant/40 px-6">
             <div class="flex shrink-0 items-center gap-2 font-ui text-ui-label text-on-surface-variant/70">
                 <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
                 "Local · saved"

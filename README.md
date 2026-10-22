@@ -29,11 +29,33 @@ topcoat dev
 
 Open <http://127.0.0.1:3000>.
 
+## App development
+
+The journal app lives in `crates/web`. Build the WASM parser first, then run the
+Topcoat server from the repo root:
+
+```sh
+wasm-pack build crates/wasm --target web --out-dir ../../web/pkg
+topcoat dev -p dainiki-web
+```
+
+Open <http://127.0.0.1:3000>. Entries are stored in the browser's Origin Private
+File System as `journal/YYYY/MM/YYYY-MM-DD.md`.
+
 ## Status
 
-The landing page is built. The local-first journal app is next. The working
-product plan lives locally at `docs/plan.md` and is intentionally ignored by
-Git. Only this README is tracked from the project root documentation.
+The landing page is live. The local-first journal is in development:
+
+- OPFS-backed Markdown entries, one file per day.
+- Daily editor with previous/next day navigation.
+- Timeline built by scanning the stored files.
+- Rust parser compiled to WASM for tags, excerpt, and word count.
+
+Next: the CodeMirror live-preview editor and richer Markdown rendering.
+
+The working plan, progress tracker, and code map live in `docs/` and are
+intentionally ignored by Git. Only this README is tracked from the project root
+documentation.
 
 ## Planned stack
 

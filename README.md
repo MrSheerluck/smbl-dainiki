@@ -47,7 +47,8 @@ File System as `journal/YYYY/MM/YYYY-MM-DD.md`.
 The landing page is live. The local-first journal is in development:
 
 - OPFS-backed Markdown entries, one file per day.
-- Rust/WASM client with a native textarea editor and a live Markdown preview pane.
+- Rust/WASM client with a cursor-aware live preview editor: the active line
+  shows Markdown source, inactive lines render inline.
 - Daily editor with previous/next day navigation.
 - Timeline built by scanning the stored files.
 - Live tag counts, clickable tag filters, and a calendar with entry dots.
@@ -65,7 +66,7 @@ documentation.
 - Rust + [Topcoat](https://github.com/tokio-rs/topcoat)
 - SQLite
 - Tailwind CSS
-- Rust/WASM browser client (`web-sys`, `pulldown-cmark`)
+- Rust/WASM browser client (`web-sys`)
 - Cloudflare R2 for encrypted paid sync
 - Dodo Payments for billing
 

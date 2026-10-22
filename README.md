@@ -51,9 +51,10 @@ The landing page is live. The local-first journal is in development:
   inactive lines hide Markdown markers.
 - Daily editor with previous/next day navigation.
 - Timeline built by scanning the stored files.
+- Live tag counts, clickable tag filters, and a calendar with entry dots.
 - Rust parser compiled to WASM for tags, excerpt, and word count.
 
-Next: live tag filtering, calendar wiring, and search.
+Next: local search and themes.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root

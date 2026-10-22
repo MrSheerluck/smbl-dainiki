@@ -28,6 +28,7 @@ web-sys = { version = "0.3", features = [
     "Event",
     "EventTarget",
     "File",
+    "FileList",
     "FileSystemDirectoryHandle",
     "FileSystemFileHandle",
     "FileSystemGetDirectoryOptions",
@@ -35,6 +36,7 @@ web-sys = { version = "0.3", features = [
     "FileSystemHandle",
     "FileSystemHandleKind",
     "FileSystemWritableFileStream",
+    "HtmlAnchorElement",
     "HtmlElement",
     "HtmlInputElement",
     "HtmlTextAreaElement",
@@ -46,7 +48,9 @@ web-sys = { version = "0.3", features = [
     "Selection",
     "Storage",
     "StorageManager",
+    "Url",
     "Window",
     "WritableStream",
     "console",
 ] }
+zip = { version = "9.0.5", default-features = false, features = ["deflate"] }

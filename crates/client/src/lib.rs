@@ -2,18 +2,25 @@ mod markdown;
 mod opfs;
 mod render;
 
-use std::{cell::RefCell, future::Future, rc::Rc};
+use std::{
+    cell::RefCell,
+    future::Future,
+    io::{Cursor, Read, Write},
+    rc::Rc,
+};
 
 use dainiki_core::{month_year, parse_date, parse_entry, weekday_name};
 use gloo_timers::callback::Timeout;
+use js_sys::Uint8Array;
 use render::EntryRecord;
 use time::Duration;
 use wasm_bindgen::{JsCast, JsValue, prelude::*};
-use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::{
-    ClipboardEvent, Document, Element, Event, HtmlElement, HtmlInputElement,
-    HtmlTextAreaElement, KeyboardEvent, Node,
+    Blob, ClipboardEvent, Document, Element, Event, File, HtmlAnchorElement, HtmlElement,
+    HtmlInputElement, HtmlTextAreaElement, KeyboardEvent, Node, Url,
 };
+use zip::{CompressionMethod, ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 struct State {
     selected_iso: String,
@@ -42,6 +49,10 @@ struct State {
     search_results: Element,
     search_matches: Vec<String>,
     search_selected: usize,
+    data_overlay: Element,
+    data_status: Element,
+    import_file: HtmlInputElement,
+    import_folder: HtmlInputElement,
     inline_iso: Option<String>,
     inline_base: String,
     inline_link: Option<Element>,
@@ -112,6 +123,10 @@ pub fn start() -> Result<(), JsValue> {
         search_results: element(&document, "#search-results")?,
         search_matches: Vec::new(),
         search_selected: 0,
+        data_overlay: element(&document, "#data-overlay")?,
+        data_status: element(&document, "#data-status")?,
+        import_file: query::<HtmlInputElement>(&document, "#import-file")?,
+        import_folder: query::<HtmlInputElement>(&document, "#import-folder-input")?,
         inline_iso: None,
         inline_base: String::new(),
         inline_link: None,
@@ -506,6 +521,88 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
+    let open_data_state = state.clone();
+    listen(
+        element(document, "#open-data")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            open_data(open_data_state.clone());
+        }),
+    )?;
+
+    let close_data_state = state.clone();
+    listen(
+        element(document, "#close-data")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            close_data(close_data_state.clone());
+        }),
+    )?;
+
+    let data_overlay_state = state.clone();
+    listen(
+        state.borrow().data_overlay.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            let Some(target) = target_element(&event) else {
+                return;
+            };
+
+            if target.id() == "data-overlay" {
+                close_data(data_overlay_state.clone());
+            }
+        }),
+    )?;
+
+    let export_state = state.clone();
+    listen(
+        element(document, "#export-zip")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            spawn_result(export_zip(export_state.clone()));
+        }),
+    )?;
+
+    let import_zip_state = state.clone();
+    listen(
+        element(document, "#import-zip")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            let input = import_zip_state.borrow().import_file.clone();
+            input.click();
+        }),
+    )?;
+
+    let import_folder_state = state.clone();
+    listen(
+        element(document, "#import-folder")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            let input = import_folder_state.borrow().import_folder.clone();
+            input.click();
+        }),
+    )?;
+
+    let import_file_state = state.clone();
+    listen(
+        state.borrow().import_file.as_ref(),
+        "change",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            let input = import_file_state.borrow().import_file.clone();
+            spawn_result(import_files(import_file_state.clone(), input));
+        }),
+    )?;
+
+    let import_folder_input_state = state.clone();
+    listen(
+        state.borrow().import_folder.as_ref(),
+        "change",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            let input = import_folder_input_state.borrow().import_folder.clone();
+            spawn_result(import_files(import_folder_input_state.clone(), input));
+        }),
+    )?;
+
     let visibility_state = state.clone();
     let visibility_document = document.clone();
     listen(
@@ -669,6 +766,228 @@ fn handle_search_keydown(state: SharedState, event: Event) {
         }
         _ => {}
     }
+}
+
+#[derive(Clone, Copy)]
+enum ImportOutcome {
+    Imported,
+    Conflict,
+    Unchanged,
+}
+
+fn open_data(state: SharedState) {
+    state.borrow().data_overlay.remove_attribute("hidden").ok();
+    set_data_status(&state, "Markdown only. Media files are ignored.");
+}
+
+fn close_data(state: SharedState) {
+    state
+        .borrow()
+        .data_overlay
+        .set_attribute("hidden", "true")
+        .ok();
+}
+
+fn set_data_status(state: &SharedState, text: &str) {
+    state.borrow().data_status.set_text_content(Some(text));
+}
+
+async fn export_zip(state: SharedState) -> Result<(), JsValue> {
+    set_data_status(&state, "Preparing export…");
+
+    let entries = opfs::list_entries().await?;
+    let count = entries.len();
+    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+    let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+
+    for (iso, text) in entries {
+        let path = format!("{}/{}/{}.md", &iso[0..4], &iso[5..7], iso);
+        writer.start_file(path, options).map_err(zip_error)?;
+        writer.write_all(text.as_bytes()).map_err(io_error)?;
+    }
+
+    writer
+        .start_file("README.md", options)
+        .map_err(zip_error)?;
+    writer
+        .write_all(
+            b"# Dainiki journal\n\nEntries are Markdown files in `YYYY/MM/YYYY-MM-DD.md`.\nDainiki is text-only; media files are not included.\n",
+        )
+        .map_err(io_error)?;
+
+    let cursor = writer.finish().map_err(zip_error)?;
+    let bytes = cursor.into_inner();
+    let document = state
+        .borrow()
+        .editor
+        .owner_document()
+        .ok_or_else(|| JsValue::from_str("no document"))?;
+
+    download_bytes(&document, &bytes, "dainiki-journal.zip")?;
+    set_data_status(&state, &format!("Exported {count} entries."));
+    Ok(())
+}
+
+async fn import_files(state: SharedState, input: HtmlInputElement) -> Result<(), JsValue> {
+    let Some(files) = input.files() else {
+        set_data_status(&state, "No files selected.");
+        return Ok(());
+    };
+
+    let mut imported = 0;
+    let mut conflicts = 0;
+    let mut skipped = 0;
+
+    for index in 0..files.length() {
+        let Some(file) = files.item(index) else {
+            continue;
+        };
+
+        let name = file.name();
+        let lower = name.to_lowercase();
+
+        if lower.ends_with(".zip") {
+            let bytes = read_file_bytes(&file).await?;
+            let (zip_imported, zip_conflicts, zip_skipped) = import_zip(bytes).await?;
+            imported += zip_imported;
+            conflicts += zip_conflicts;
+            skipped += zip_skipped;
+        } else if lower.ends_with(".md") {
+            let Some(iso) = date_from_stem(&name) else {
+                skipped += 1;
+                continue;
+            };
+
+            let text = read_file_text(&file).await?;
+
+            match import_markdown(&iso, &text).await? {
+                ImportOutcome::Imported => imported += 1,
+                ImportOutcome::Conflict => conflicts += 1,
+                ImportOutcome::Unchanged => {}
+            }
+        } else {
+            skipped += 1;
+        }
+    }
+
+    input.set_value("");
+    let selected = state.borrow().selected_iso.clone();
+    load_entry(state.clone(), &selected).await?;
+    refresh(state.clone()).await?;
+    set_data_status(
+        &state,
+        &format!("Imported {imported}, conflicts {conflicts}, skipped {skipped}."),
+    );
+    Ok(())
+}
+
+async fn import_zip(bytes: Vec<u8>) -> Result<(usize, usize, usize), JsValue> {
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).map_err(zip_error)?;
+    let mut imported = 0;
+    let mut conflicts = 0;
+    let mut skipped = 0;
+
+    for index in 0..archive.len() {
+        let mut file = archive.by_index(index).map_err(zip_error)?;
+        let name = file.name().map_err(zip_error)?.to_string();
+
+        if !name.to_lowercase().ends_with(".md") {
+            skipped += 1;
+            continue;
+        }
+
+        let stem = name.rsplit('/').next().unwrap_or(&name);
+        let Some(iso) = date_from_stem(stem) else {
+            skipped += 1;
+            continue;
+        };
+
+        let mut text = String::new();
+        file.read_to_string(&mut text).map_err(io_error)?;
+
+        match import_markdown(&iso, &text).await? {
+            ImportOutcome::Imported => imported += 1,
+            ImportOutcome::Conflict => conflicts += 1,
+            ImportOutcome::Unchanged => {}
+        }
+    }
+
+    Ok((imported, conflicts, skipped))
+}
+
+async fn import_markdown(iso: &str, text: &str) -> Result<ImportOutcome, JsValue> {
+    match opfs::read_entry(iso).await? {
+        Some(existing) if existing == text => Ok(ImportOutcome::Unchanged),
+        Some(_) => {
+            opfs::write_conflict(iso, text).await?;
+            Ok(ImportOutcome::Conflict)
+        }
+        None => {
+            opfs::write_entry(iso, text).await?;
+            Ok(ImportOutcome::Imported)
+        }
+    }
+}
+
+async fn read_file_text(file: &File) -> Result<String, JsValue> {
+    let text = JsFuture::from(file.text()).await?;
+    Ok(text.as_string().unwrap_or_default())
+}
+
+async fn read_file_bytes(file: &File) -> Result<Vec<u8>, JsValue> {
+    let buffer = JsFuture::from(file.array_buffer()).await?;
+    Ok(Uint8Array::new(&buffer).to_vec())
+}
+
+fn date_from_stem(stem: &str) -> Option<String> {
+    let stem = stem.strip_suffix(".md").unwrap_or(stem);
+
+    if stem.len() != 10 {
+        return None;
+    }
+
+    let valid = stem.chars().enumerate().all(|(index, ch)| {
+        if index == 4 || index == 7 {
+            ch == '-'
+        } else {
+            ch.is_ascii_digit()
+        }
+    });
+
+    if valid && parse_date(stem).is_some() {
+        Some(stem.to_string())
+    } else {
+        None
+    }
+}
+
+fn download_bytes(document: &Document, bytes: &[u8], filename: &str) -> Result<(), JsValue> {
+    let parts = js_sys::Array::new();
+    parts.push(&Uint8Array::from(bytes));
+    let parts: JsValue = parts.into();
+    let blob = Blob::new_with_u8_array_sequence(&parts)?;
+    let url = Url::create_object_url_with_blob(&blob)?;
+    let anchor: HtmlAnchorElement = document.create_element("a")?.dyn_into()?;
+
+    anchor.set_href(&url);
+    anchor.set_download(filename);
+    document
+        .body()
+        .ok_or_else(|| JsValue::from_str("no body"))?
+        .append_child(anchor.as_ref())?;
+    anchor.click();
+    anchor.remove();
+    Url::revoke_object_url(&url)?;
+
+    Ok(())
+}
+
+fn zip_error(error: zip::result::ZipError) -> JsValue {
+    JsValue::from_str(&format!("zip: {error}"))
+}
+
+fn io_error(error: std::io::Error) -> JsValue {
+    JsValue::from_str(&format!("io: {error}"))
 }
 
 fn record_history(state: &SharedState) {

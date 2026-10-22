@@ -32,6 +32,75 @@ pub async fn timeline() -> Result<impl View> {
                 </main>
             </div>
             search_overlay()
+            data_overlay()
+        </div>
+    })
+}
+
+#[component]
+pub async fn data_overlay() -> Result<impl View> {
+    Ok(view! {
+        <div
+            id="data-overlay"
+            hidden="true"
+            class="fixed inset-0 z-50 flex items-start justify-center bg-on-surface/20 px-4 pt-24 backdrop-blur-sm"
+        >
+            <div class="w-full max-w-md overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl">
+                <div class="flex items-center justify-between border-b border-outline-variant/40 px-5 py-3">
+                    <h2 class="font-display text-lg text-on-surface">"Data"</h2>
+                    <button
+                        id="close-data"
+                        type="button"
+                        aria-label="Close data panel"
+                        class="rounded px-2 py-1 font-ui text-ui-label text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                    >
+                        "×"
+                    </button>
+                </div>
+                <div class="space-y-3 p-5">
+                    <button
+                        id="export-zip"
+                        type="button"
+                        class="w-full rounded border border-outline-variant/60 px-4 py-2 text-left font-ui text-ui-body text-on-surface hover:bg-surface-container"
+                    >
+                        "Export journal as zip"
+                    </button>
+                    <button
+                        id="import-zip"
+                        type="button"
+                        class="w-full rounded border border-outline-variant/60 px-4 py-2 text-left font-ui text-ui-body text-on-surface hover:bg-surface-container"
+                    >
+                        "Import zip or Markdown files"
+                    </button>
+                    <button
+                        id="import-folder"
+                        type="button"
+                        class="w-full rounded border border-outline-variant/60 px-4 py-2 text-left font-ui text-ui-body text-on-surface hover:bg-surface-container"
+                    >
+                        "Import a folder"
+                    </button>
+                    <p
+                        id="data-status"
+                        class="font-ui text-[10px] text-on-surface-variant/60"
+                    >
+                        "Markdown only. Media files are ignored."
+                    </p>
+                    <input
+                        id="import-file"
+                        type="file"
+                        accept=".zip,.md,text/markdown"
+                        multiple="true"
+                        hidden="true"
+                    >
+                    <input
+                        id="import-folder-input"
+                        type="file"
+                        webkitdirectory="true"
+                        multiple="true"
+                        hidden="true"
+                    >
+                </div>
+            </div>
         </div>
     })
 }
@@ -271,6 +340,32 @@ pub async fn sidebar() -> Result<impl View> {
                     </button>
                     <span class="rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/70">
                         "⌘,"
+                    </span>
+                </div>
+
+                <div class="flex items-center justify-between px-1">
+                    <button
+                        id="open-data"
+                        type="button"
+                        class="flex items-center gap-2 font-ui text-ui-label text-on-surface-variant hover:text-on-surface"
+                    >
+                        <svg
+                            aria-hidden="true"
+                            class="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                        >
+                            <ellipse cx="12" cy="5" rx="8" ry="3"></ellipse>
+                            <path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path>
+                            <path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path>
+                        </svg>
+                        <span>"Data"</span>
+                    </button>
+                    <span class="font-ui text-[10px] text-on-surface-variant/50">
+                        "Import / export"
                     </span>
                 </div>
 

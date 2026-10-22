@@ -10,7 +10,9 @@ use render::EntryRecord;
 use time::Duration;
 use wasm_bindgen::{JsCast, JsValue, prelude::*};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{Document, Element, Event, HtmlElement, KeyboardEvent, Node};
+use web_sys::{
+    ClipboardEvent, Document, Element, Event, HtmlElement, KeyboardEvent, Node,
+};
 
 struct State {
     selected_iso: String,
@@ -21,6 +23,10 @@ struct State {
     active_tag: Option<String>,
     has_file: bool,
     saving: bool,
+    composing: bool,
+    undo_stack: Vec<String>,
+    redo_stack: Vec<String>,
+    last_snapshot: String,
     editor: HtmlElement,
     status: Element,
     editor_tags: Element,
@@ -35,6 +41,7 @@ struct State {
     today_button: Element,
     next_day_button: Element,
     save_timeout: Option<Timeout>,
+    history_timeout: Option<Timeout>,
 }
 
 type SharedState = Rc<RefCell<State>>;
@@ -72,6 +79,10 @@ pub fn start() -> Result<(), JsValue> {
         active_tag: None,
         has_file: false,
         saving: false,
+        composing: false,
+        undo_stack: Vec::new(),
+        redo_stack: Vec::new(),
+        last_snapshot: String::new(),
         editor,
         status: element(&document, "#entry-status")?,
         editor_tags: element(&document, "#entry-tags")?,
@@ -86,6 +97,7 @@ pub fn start() -> Result<(), JsValue> {
         today_button: element(&document, "#today-button")?,
         next_day_button: element(&document, "#next-day")?,
         save_timeout: None,
+        history_timeout: None,
     }));
 
     bind_events(&state, &document)?;
@@ -110,7 +122,42 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         editor.as_ref(),
         "input",
         Closure::<dyn FnMut(Event)>::new(move |_| {
+            if input_state.borrow().composing {
+                return;
+            }
+
             schedule_save(input_state.clone());
+            schedule_history(input_state.clone());
+        }),
+    )?;
+
+    let composition_start = state.clone();
+    listen(
+        editor.as_ref(),
+        "compositionstart",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            composition_start.borrow_mut().composing = true;
+        }),
+    )?;
+
+    let composition_end = state.clone();
+    listen(
+        editor.as_ref(),
+        "compositionend",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            composition_end.borrow_mut().composing = false;
+            schedule_save(composition_end.clone());
+            schedule_history(composition_end.clone());
+        }),
+    )?;
+
+    let paste_state = state.clone();
+    let paste_document = document.clone();
+    listen(
+        editor.as_ref(),
+        "paste",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_paste(paste_state.clone(), &paste_document, event);
         }),
     )?;
 
@@ -139,6 +186,10 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         document.as_ref(),
         "selectionchange",
         Closure::<dyn FnMut(Event)>::new(move |_| {
+            if selection_state.borrow().composing {
+                return;
+            }
+
             update_active_line(selection_state.clone(), &selection_document);
         }),
     )?;
@@ -288,6 +339,30 @@ fn handle_keydown(state: SharedState, document: &Document, event: Event) {
         return;
     };
 
+    if event.is_composing() {
+        return;
+    }
+
+    let modifier = event.meta_key() || event.ctrl_key();
+
+    if modifier && event.key().eq_ignore_ascii_case("z") {
+        event.prevent_default();
+
+        if event.shift_key() {
+            redo(state, document);
+        } else {
+            undo(state, document);
+        }
+
+        return;
+    }
+
+    if modifier && event.key().eq_ignore_ascii_case("y") {
+        event.prevent_default();
+        redo(state, document);
+        return;
+    }
+
     if event.key() == "Enter" {
         event.prevent_default();
         split_line(state, document);
@@ -297,6 +372,251 @@ fn handle_keydown(state: SharedState, document: &Document, event: Event) {
     if event.key() == "Backspace" && merge_line(state, document) {
         event.prevent_default();
     }
+}
+
+fn record_history(state: &SharedState) {
+    let source = markdown::source_from_editor(&state.borrow().editor);
+    let mut borrowed = state.borrow_mut();
+
+    if source == borrowed.last_snapshot {
+        return;
+    }
+
+    let snapshot = borrowed.last_snapshot.clone();
+    borrowed.undo_stack.push(snapshot);
+
+    if borrowed.undo_stack.len() > 80 {
+        borrowed.undo_stack.remove(0);
+    }
+
+    borrowed.last_snapshot = source;
+    borrowed.redo_stack.clear();
+}
+
+fn push_current_history(state: &SharedState) {
+    let current = markdown::source_from_editor(&state.borrow().editor);
+    let mut borrowed = state.borrow_mut();
+
+    if current == borrowed.last_snapshot {
+        return;
+    }
+
+    borrowed.undo_stack.push(current.clone());
+
+    if borrowed.undo_stack.len() > 80 {
+        borrowed.undo_stack.remove(0);
+    }
+
+    borrowed.last_snapshot = current;
+    borrowed.redo_stack.clear();
+}
+
+fn sync_snapshot(state: &SharedState) {
+    let current = markdown::source_from_editor(&state.borrow().editor);
+    state.borrow_mut().last_snapshot = current;
+}
+
+fn schedule_history(state: SharedState) {
+    let next_state = state.clone();
+    let mut state = state.borrow_mut();
+
+    state.history_timeout = None;
+    state.history_timeout = Some(Timeout::new(350, move || {
+        record_history(&next_state);
+    }));
+}
+
+fn undo(state: SharedState, document: &Document) {
+    let current = markdown::source_from_editor(&state.borrow().editor);
+    let mut borrowed = state.borrow_mut();
+    let Some(previous) = borrowed.undo_stack.pop() else {
+        return;
+    };
+
+    if current != previous {
+        borrowed.redo_stack.push(current);
+    }
+
+    borrowed.last_snapshot = previous.clone();
+    borrowed.history_timeout = None;
+    drop(borrowed);
+
+    restore_source(&state, document, &previous);
+}
+
+fn redo(state: SharedState, document: &Document) {
+    let current = markdown::source_from_editor(&state.borrow().editor);
+    let mut borrowed = state.borrow_mut();
+    let Some(next) = borrowed.redo_stack.pop() else {
+        return;
+    };
+
+    borrowed.undo_stack.push(current);
+    borrowed.last_snapshot = next.clone();
+    borrowed.history_timeout = None;
+    drop(borrowed);
+
+    restore_source(&state, document, &next);
+}
+
+fn restore_source(state: &SharedState, document: &Document, source: &str) {
+    let editor = state.borrow().editor.clone();
+    markdown::render_document(&editor, source);
+
+    if let Ok(Some(line)) = editor.query_selector(".line:last-child") {
+        line.class_list().add_1("active").ok();
+        place_caret(document, &line, false);
+    }
+
+    editor.focus().ok();
+    schedule_save(state.clone());
+}
+
+fn handle_paste(state: SharedState, document: &Document, event: Event) {
+    let Ok(event) = event.dyn_into::<ClipboardEvent>() else {
+        return;
+    };
+
+    let Some(data) = event.clipboard_data() else {
+        return;
+    };
+
+    let Ok(text) = data.get_data("text/plain") else {
+        return;
+    };
+
+    if text.is_empty() {
+        return;
+    }
+
+    event.prevent_default();
+
+    let Some(line) = ensure_active_line(document) else {
+        return;
+    };
+
+    push_current_history(&state);
+
+    let source = line.text_content().unwrap_or_default();
+    let offset = caret_offset(document, &line).unwrap_or_else(|| utf16_len(&source));
+    let (before, after) = split_at_utf16(&source, offset);
+    let normalized = normalize_newlines(&text);
+    let parts: Vec<&str> = normalized.split('\n').collect();
+
+    if parts.len() == 1 {
+        let next = format!("{before}{}{after}", parts[0]);
+        markdown::render_line_into(&line, &next, true);
+        place_caret_at_offset(document, &line, utf16_len(before) + utf16_len(parts[0]));
+        sync_snapshot(&state);
+        schedule_save(state);
+        return;
+    }
+
+    let first = format!("{before}{}", parts[0]);
+    markdown::render_line_into(&line, &first, false);
+
+    let mut anchor = line;
+
+    for part in &parts[1..parts.len() - 1] {
+        if let Some(new_line) = insert_line_after(document, &anchor, part, false) {
+            anchor = new_line;
+        }
+    }
+
+    let last_source = format!("{}{after}", parts[parts.len() - 1]);
+
+    if let Some(last_line) = insert_line_after(document, &anchor, &last_source, true) {
+        last_line.class_list().add_1("active").ok();
+        place_caret_at_offset(document, &last_line, utf16_len(parts[parts.len() - 1]));
+    }
+
+    sync_snapshot(&state);
+    schedule_save(state);
+}
+
+fn ensure_active_line(document: &Document) -> Option<Element> {
+    if let Some(line) = active_line(document) {
+        return Some(line);
+    }
+
+    let editor = document.query_selector("#entry-editor").ok().flatten()?;
+    let first = editor.first_element_child()?;
+    first.class_list().add_1("active").ok()?;
+    place_caret(document, &first, true);
+    Some(first)
+}
+
+fn insert_line_after(
+    document: &Document,
+    line: &Element,
+    source: &str,
+    active: bool,
+) -> Option<Element> {
+    let new_line = document.create_element("div").ok()?;
+    markdown::render_line_into(&new_line, source, active);
+
+    let parent = line.parent_node()?;
+    let reference = line.next_sibling();
+    parent
+        .insert_before(new_line.as_ref(), reference.as_ref())
+        .ok()?;
+
+    Some(new_line)
+}
+
+fn place_caret_at_offset(document: &Document, line: &Element, offset: usize) {
+    let mut remaining = offset;
+
+    if place_in_node(document, line.as_ref(), &mut remaining) {
+        return;
+    }
+
+    place_caret(document, line, false);
+}
+
+fn place_in_node(document: &Document, node: &Node, remaining: &mut usize) -> bool {
+    if node.node_type() == Node::TEXT_NODE {
+        let length = utf16_len(&node.text_content().unwrap_or_default());
+
+        if *remaining <= length {
+            let Ok(range) = document.create_range() else {
+                return false;
+            };
+
+            if range.set_start(node, *remaining as u32).is_err() {
+                return false;
+            }
+
+            range.collapse_with_to_start(true);
+
+            let Ok(Some(selection)) = document.get_selection() else {
+                return false;
+            };
+
+            selection.remove_all_ranges().ok();
+            selection.add_range(&range).ok();
+
+            return true;
+        }
+
+        *remaining -= length;
+    } else {
+        let mut child = node.first_child();
+
+        while let Some(current) = child {
+            if place_in_node(document, &current, remaining) {
+                return true;
+            }
+
+            child = current.next_sibling();
+        }
+    }
+
+    false
+}
+
+fn normalize_newlines(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n")
 }
 
 fn update_active_line(state: SharedState, document: &Document) {
@@ -323,6 +643,8 @@ fn split_line(state: SharedState, document: &Document) {
         return;
     };
 
+    push_current_history(&state);
+
     let source = line.text_content().unwrap_or_default();
     let offset = caret_offset(document, &line).unwrap_or_else(|| utf16_len(&source));
     let (before, after) = split_at_utf16(&source, offset);
@@ -348,6 +670,7 @@ fn split_line(state: SharedState, document: &Document) {
     }
 
     place_caret(document, &new_line, true);
+    sync_snapshot(&state);
     schedule_save(state);
 }
 
@@ -364,12 +687,15 @@ fn merge_line(state: SharedState, document: &Document) -> bool {
         return false;
     };
 
+    push_current_history(&state);
+
     let mut source = previous.text_content().unwrap_or_default();
     source.push_str(&line.text_content().unwrap_or_default());
 
     markdown::render_line_into(&previous, &source, true);
     line.remove();
     place_caret(document, &previous, false);
+    sync_snapshot(&state);
     schedule_save(state);
     true
 }
@@ -493,6 +819,14 @@ async fn load_entry(state: SharedState, iso: &str) -> Result<(), JsValue> {
         Ok(Some(text)) => {
             markdown::render_document(&state.borrow().editor, &text);
 
+            {
+                let mut state = state.borrow_mut();
+                state.undo_stack.clear();
+                state.redo_stack.clear();
+                state.last_snapshot = text.clone();
+                state.history_timeout = None;
+            }
+
             let meta = parse_date(iso).map(|date| parse_entry(&text, date));
             let words = meta.as_ref().map_or(0, |meta| meta.words);
             let tags = meta
@@ -506,7 +840,14 @@ async fn load_entry(state: SharedState, iso: &str) -> Result<(), JsValue> {
         Ok(None) => {
             markdown::render_document(&state.borrow().editor, "");
             state.borrow().editor_tags.set_inner_html("");
-            state.borrow_mut().has_file = false;
+            {
+                let mut state = state.borrow_mut();
+                state.has_file = false;
+                state.undo_stack.clear();
+                state.redo_stack.clear();
+                state.last_snapshot.clear();
+                state.history_timeout = None;
+            }
             set_status(&state, "New entry — not saved yet");
         }
         Err(error) => {

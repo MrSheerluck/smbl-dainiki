@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #fef8f6;
+  --color-surface-container-low: #f8f2f0;
+  --color-surface-container: #f2edeb;
+  --color-surface-container-high: #ede7e5;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-surface: #1d1b1a;
+  --color-on-surface-variant: #424843;
+  --color-primary: #32533f;
+  --color-on-primary: #ffffff;
+  --color-secondary: #944924;
+  --color-outline: #727973;
+  --color-outline-variant: #c2c8c1;
+
+  --font-display: ui-serif, Georgia, "Times New Roman", serif;
+  --font-journal: ui-serif, Georgia, "Times New Roman", serif;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --text-display-date: 3rem;
+  --text-display-date--line-height: 3.5rem;
+  --text-display-date--letter-spacing: -0.02em;
+
+  --text-headline-lg: 2.25rem;
+  --text-headline-lg--line-height: 2.75rem;
+  --text-headline-lg--letter-spacing: -0.015em;
+
+  --text-headline-md: 1.5rem;
+  --text-headline-md--line-height: 2rem;
+  --text-headline-md--letter-spacing: -0.01em;
+
+  --text-journal-lg: 1.1875rem;
+  --text-journal-lg--line-height: 1.9375rem;
+
+  --text-journal: 1.0625rem;
+  --text-journal--line-height: 1.75rem;
+
+  --text-ui-body: 0.8125rem;
+  --text-ui-body--line-height: 1.25rem;
+
+  --text-ui-label: 0.75rem;
+  --text-ui-label--line-height: 1rem;
+  --text-ui-label--letter-spacing: 0.02em;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-surface);
+    color: var(--color-on-surface);
+  }
+}

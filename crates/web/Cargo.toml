@@ -5,5 +5,8 @@ edition = "2024"
 publish = false
 
 [dependencies]
-topcoat = "0.10.0"
+topcoat = { version = "0.10.0", features = ["tailwind"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[build-dependencies]
+topcoat = { version = "0.10.0", default-features = false, features = ["tailwind"] }

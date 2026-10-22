@@ -2,7 +2,6 @@ use crate::typography::{INTER, NEWSREADER};
 
 use topcoat::{
     Result,
-    asset::asset,
     router::{Slot, layout},
     view::{View, view},
 };
@@ -24,7 +23,7 @@ pub async fn root(slot: Slot<'_>) -> Result<impl View> {
             </head>
             <body class="bg-surface font-ui text-ui-body text-on-surface antialiased">
                 (slot)
-                <script type="module" src=(asset!("./scripts/journal.js"))></script>
+                <script type="module" src="/editor/journal.js"></script>
             </body>
         </html>
     })

@@ -14,6 +14,7 @@ async fn main() {
         .layout(layout::root)
         .page(app::timeline)
         .serve_dir("/wasm/{*file}", "web/pkg")
+        .serve_dir("/editor/{*file}", "web/editor/dist")
         .assets(AssetBundle::load().unwrap())
         .font(typography::INTER)
         .font(typography::NEWSREADER)

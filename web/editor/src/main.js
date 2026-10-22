@@ -1,4 +1,10 @@
-const editor = document.querySelector("#entry-editor");
+import {
+  createEditor,
+  getEditorText,
+  setEditorText,
+} from "./editor.js";
+
+const editorHost = document.querySelector("#entry-editor");
 const status = document.querySelector("#entry-status");
 const tagList = document.querySelector("#entry-tags");
 const timeline = document.querySelector("#timeline-entries");
@@ -15,6 +21,8 @@ let wasm = null;
 let currentFile = null;
 let saveTimer = null;
 let savePromise = null;
+let editorView = null;
+let loading = false;
 
 function isoFor(date) {
   const year = String(date.getFullYear());
@@ -49,9 +57,6 @@ function updateDateLabels(iso) {
   if (monthLabel) monthLabel.textContent = info.month;
   if (todayButton) todayButton.hidden = iso === todayIso;
   if (nextDayButton) nextDayButton.disabled = iso === todayIso;
-  if (editor) {
-    editor.placeholder = iso === todayIso ? "Write today's entry…" : "Edit this entry…";
-  }
 }
 
 async function initWasm() {
@@ -123,13 +128,20 @@ async function loadEntry(iso) {
     const file = await currentFile.getFile();
     const text = await file.text();
 
-    editor.value = text;
+    loading = true;
+    setEditorText(editorView, text);
+    loading = false;
+
     const meta = renderEditorMeta(text, iso);
     setStatus(`Loaded · ${meta.words} words`);
   } catch (error) {
+    loading = false;
+
     if (error.name === "NotFoundError") {
       currentFile = null;
-      editor.value = "";
+      loading = true;
+      setEditorText(editorView, "");
+      loading = false;
       renderEditorMeta("", iso);
       setStatus("New entry — not saved yet");
     } else {
@@ -141,7 +153,7 @@ async function loadEntry(iso) {
 
 async function doSave() {
   const iso = selectedIso;
-  const text = editor.value;
+  const text = getEditorText(editorView);
 
   if (!text.trim() && !currentFile) {
     setStatus("New entry — not saved yet");
@@ -162,7 +174,7 @@ async function doSave() {
     setStatus(`Saved locally · ${meta.words} words`);
     await refreshTimeline();
 
-    if (editor.value !== text) {
+    if (getEditorText(editorView) !== text) {
       scheduleSave();
     }
   } catch (error) {
@@ -358,31 +370,29 @@ async function selectDate(iso) {
   await loadEntry(iso);
   await refreshTimeline();
 
-  if (editor) {
-    editor.focus();
-    editor.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (editorView) {
+    editorView.focus();
+    editorHost.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
 
 async function main() {
-  if (!editor) return;
+  if (!editorHost) return;
 
   updateDateLabels(selectedIso);
 
   if (!navigator.storage?.getDirectory) {
     setStatus("This browser does not support local file storage");
-    editor.disabled = true;
     return;
   }
+
+  editorView = createEditor(editorHost, () => {
+    if (!loading) scheduleSave();
+  });
 
   await initWasm();
   await loadEntry(selectedIso);
   await refreshTimeline();
-
-  editor.addEventListener("input", scheduleSave);
-  editor.addEventListener("blur", () => {
-    void saveEntry();
-  });
 
   todayButton?.addEventListener("click", () => {
     void selectDate(todayIso);

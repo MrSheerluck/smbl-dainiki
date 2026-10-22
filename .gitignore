@@ -26,6 +26,8 @@ node_modules/
 /web/node_modules/
 /web/dist/
 /web/.vite/
+/web/editor/node_modules/
+/web/editor/dist/
 
 # OS / editor
 .DS_Store

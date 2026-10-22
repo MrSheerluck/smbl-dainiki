@@ -105,12 +105,10 @@ pub async fn today_entry() -> Result<impl View> {
                         </button>
                     </div>
 
-                    <textarea
+                    <div
                         id="entry-editor"
-                        class="min-h-[22rem] w-full resize-none border-0 bg-transparent font-journal text-journal text-on-surface outline-none placeholder:text-on-surface-variant/40"
-                        placeholder="Write today's entry…"
-                        spellcheck="true"
-                    ></textarea>
+                        class="min-h-[22rem] w-full"
+                    ></div>
 
                     <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/30 pt-3">
                         <div

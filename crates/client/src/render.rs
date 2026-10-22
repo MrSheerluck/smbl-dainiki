@@ -12,13 +12,23 @@ pub struct EntryRecord {
     pub meta: EntryMeta,
 }
 
-pub fn timeline(entries: &[EntryRecord], selected_iso: &str, active_tag: Option<&str>) -> String {
+pub fn timeline(
+    entries: &[EntryRecord],
+    selected_iso: &str,
+    active_tag: Option<&str>,
+    limit: usize,
+) -> String {
     let mut html = String::new();
+    let visible: Vec<&EntryRecord> = entries
+        .iter()
+        .filter(|entry| {
+            entry.iso != selected_iso
+                && active_tag.is_none_or(|tag| entry.meta.tags.iter().any(|value| value == tag))
+        })
+        .collect();
+    let total = visible.len();
 
-    for entry in entries.iter().filter(|entry| {
-        entry.iso != selected_iso
-            && active_tag.is_none_or(|tag| entry.meta.tags.iter().any(|value| value == tag))
-    }) {
+    for entry in visible.iter().take(limit) {
         let date = entry.meta.date;
         let excerpt = escape_html(if entry.meta.excerpt.is_empty() {
             "Empty entry"
@@ -73,6 +83,18 @@ pub fn timeline(entries: &[EntryRecord], selected_iso: &str, active_tag: Option<
         let _ = write!(
             html,
             r#"<p class="font-ui text-ui-label text-on-surface-variant/60">{message}</p>"#
+        );
+    } else if total > limit {
+        let _ = write!(
+            html,
+            r#"<div class="pt-2 text-center">
+  <button type="button" data-load-older="true" class="rounded border border-outline-variant/60 px-4 py-2 font-ui text-ui-body text-on-surface-variant hover:bg-surface-container hover:text-on-surface">
+    Load older entries
+  </button>
+  <p class="mt-2 font-ui text-[10px] text-on-surface-variant/50">Showing {shown} of {total}</p>
+</div>"#,
+            shown = limit.min(total),
+            total = total
         );
     }
 

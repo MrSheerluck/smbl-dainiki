@@ -28,6 +28,7 @@ struct State {
     calendar_year: i32,
     calendar_month: u32,
     entries: Vec<EntryRecord>,
+    timeline_limit: usize,
     active_tag: Option<String>,
     has_file: bool,
     base_text: String,
@@ -61,6 +62,8 @@ struct State {
     inline_status: Option<Element>,
     inline_saving: bool,
     inline_save_timeout: Option<Timeout>,
+    sidebar: Element,
+    sidebar_backdrop: Element,
     day_label: Element,
     weekday_label: Element,
     month_label: Element,
@@ -102,6 +105,7 @@ pub fn start() -> Result<(), JsValue> {
         calendar_year,
         calendar_month,
         entries: Vec::new(),
+        timeline_limit: 30,
         active_tag: None,
         has_file: false,
         base_text: String::new(),
@@ -135,6 +139,8 @@ pub fn start() -> Result<(), JsValue> {
         inline_status: None,
         inline_saving: false,
         inline_save_timeout: None,
+        sidebar: element(&document, "aside")?,
+        sidebar_backdrop: element(&document, "#sidebar-backdrop")?,
         day_label: element(&document, "#today-day")?,
         weekday_label: element(&document, "#today-weekday")?,
         month_label: element(&document, "#today-month")?,
@@ -357,6 +363,15 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
                 return;
             };
 
+            if target.closest("[data-load-older]").ok().flatten().is_some() {
+                {
+                    let mut state = timeline_state.borrow_mut();
+                    state.timeline_limit += 30;
+                }
+                render_ui(timeline_state.clone());
+                return;
+            }
+
             let Ok(Some(link)) = target.closest("[data-iso]") else {
                 return;
             };
@@ -527,6 +542,33 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
 
             close_search(search_result_state.clone());
             open_entry(search_result_state.clone(), iso);
+        }),
+    )?;
+
+    let open_sidebar_state = state.clone();
+    listen(
+        element(document, "#open-sidebar")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            open_sidebar(open_sidebar_state.clone());
+        }),
+    )?;
+
+    let close_sidebar_state = state.clone();
+    listen(
+        element(document, "#close-sidebar")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            close_sidebar(close_sidebar_state.clone());
+        }),
+    )?;
+
+    let sidebar_backdrop_state = state.clone();
+    listen(
+        state.borrow().sidebar_backdrop.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            close_sidebar(sidebar_backdrop_state.clone());
         }),
     )?;
 
@@ -782,6 +824,26 @@ enum ImportOutcome {
     Imported,
     Conflict,
     Unchanged,
+}
+
+fn open_sidebar(state: SharedState) {
+    let state = state.borrow();
+    state.sidebar.class_list().remove_1("hidden").ok();
+    state.sidebar.class_list().add_1("flex").ok();
+    state
+        .sidebar_backdrop
+        .remove_attribute("hidden")
+        .ok();
+}
+
+fn close_sidebar(state: SharedState) {
+    let state = state.borrow();
+    state.sidebar.class_list().add_1("hidden").ok();
+    state.sidebar.class_list().remove_1("flex").ok();
+    state
+        .sidebar_backdrop
+        .set_attribute("hidden", "true")
+        .ok();
 }
 
 fn open_data(state: SharedState) {
@@ -1687,6 +1749,7 @@ fn render_ui(state: SharedState) {
                 &state.entries,
                 &state.selected_iso,
                 state.active_tag.as_deref(),
+                state.timeline_limit,
             ),
             render::tags(&state.entries, state.active_tag.as_deref()),
             render::calendar(
@@ -1722,7 +1785,11 @@ fn render_ui(state: SharedState) {
 }
 
 fn set_active_tag(state: SharedState, tag: Option<String>) {
-    state.borrow_mut().active_tag = tag;
+    {
+        let mut state = state.borrow_mut();
+        state.active_tag = tag;
+        state.timeline_limit = 30;
+    }
     render_ui(state);
 }
 
@@ -2039,6 +2106,7 @@ async fn select_date(state: SharedState, iso: String) -> Result<(), JsValue> {
         let mut state = state.borrow_mut();
         state.selected_iso = iso.clone();
         state.has_file = false;
+        state.timeline_limit = 30;
         let (year, month) = month_parts(&iso);
         state.calendar_year = year;
         state.calendar_month = month;

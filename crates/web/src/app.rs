@@ -9,6 +9,11 @@ pub async fn timeline() -> Result<impl View> {
     Ok(view! {
         <div class="flex min-h-screen bg-surface lg:h-screen lg:overflow-hidden">
             sidebar()
+            <div
+                id="sidebar-backdrop"
+                hidden="true"
+                class="fixed inset-0 z-30 bg-on-surface/20 backdrop-blur-sm lg:hidden"
+            ></div>
             <div class="flex min-w-0 flex-1 flex-col lg:min-h-0">
                 topbar()
                 <main class="flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:min-h-0 lg:overflow-y-auto lg:px-10">
@@ -218,7 +223,7 @@ pub async fn today_entry() -> Result<impl View> {
 #[component]
 pub async fn sidebar() -> Result<impl View> {
     Ok(view! {
-        <aside class="hidden h-screen w-[230px] shrink-0 flex-col border-r border-outline-variant/40 bg-surface-container-low/70 lg:flex">
+        <aside class="fixed inset-y-0 left-0 z-40 hidden h-screen w-[230px] shrink-0 flex-col border-r border-outline-variant/40 bg-surface-container-low/70 lg:static lg:z-auto lg:flex">
             <div class="min-h-0 flex-1 overflow-hidden px-3 py-4">
                 <div class="flex items-center gap-3 px-2">
                     <div class="flex h-9 w-9 items-center justify-center rounded-sm bg-primary font-display text-lg text-on-primary">
@@ -232,6 +237,14 @@ pub async fn sidebar() -> Result<impl View> {
                             "A quiet journal"
                         </p>
                     </div>
+                    <button
+                        id="close-sidebar"
+                        type="button"
+                        aria-label="Close navigation"
+                        class="ml-auto rounded px-2 py-1 font-ui text-ui-label text-on-surface-variant hover:bg-surface-container hover:text-on-surface lg:hidden"
+                    >
+                        "×"
+                    </button>
                 </div>
 
                 <nav class="mt-6 space-y-0.5">
@@ -382,9 +395,19 @@ pub async fn sidebar() -> Result<impl View> {
 pub async fn topbar() -> Result<impl View> {
     Ok(view! {
         <header class="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-outline-variant/40 px-6">
-            <div class="flex shrink-0 items-center gap-2 font-ui text-ui-label text-on-surface-variant/70">
-                <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
-                "Local · saved"
+            <div class="flex items-center gap-2">
+                <button
+                    id="open-sidebar"
+                    type="button"
+                    aria-label="Open navigation"
+                    class="rounded px-2 py-1 font-ui text-ui-label text-on-surface-variant hover:bg-surface-container hover:text-on-surface lg:hidden"
+                >
+                    "☰"
+                </button>
+                <div class="hidden shrink-0 items-center gap-2 font-ui text-ui-label text-on-surface-variant/70 sm:flex">
+                    <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+                    "Local · saved"
+                </div>
             </div>
 
             <div class="flex min-w-0 items-center gap-2">

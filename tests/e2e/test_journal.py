@@ -1,0 +1,352 @@
+import datetime as dt
+import os
+import platform
+import tempfile
+import unittest
+import zipfile
+
+from playwright.sync_api import sync_playwright
+
+BASE_URL = os.environ.get("DAINIKI_URL", "http://127.0.0.1:3000")
+MOD = "Meta" if platform.system() == "Darwin" else "Control"
+
+
+def iso_shift(iso: str, days: int) -> str:
+    return (dt.date.fromisoformat(iso) + dt.timedelta(days=days)).isoformat()
+
+
+class DainikiE2E(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.playwright = sync_playwright().start()
+        cls.browser = cls.playwright.chromium.launch()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.browser.close()
+        cls.playwright.stop()
+
+    def setUp(self):
+        self.context = self.browser.new_context(
+            viewport={"width": 1280, "height": 1000},
+            accept_downloads=True,
+        )
+        self.page = self.context.new_page()
+        self.page_errors = []
+        self.page.on("pageerror", lambda error: self.page_errors.append(str(error)))
+        self.open_app()
+
+    def tearDown(self):
+        self.context.close()
+        self.assertEqual(self.page_errors, [])
+
+    def wait_for_editor(self):
+        for _ in range(2):
+            try:
+                self.page.wait_for_selector("#entry-editor .line", timeout=10000)
+                self.page.wait_for_timeout(700)
+
+                if self.page.locator("#entry-editor .line").count() > 0:
+                    return
+            except Exception:
+                pass
+
+            self.page.reload(wait_until="networkidle")
+
+        self.page.wait_for_selector("#entry-editor .line", timeout=15000)
+
+    def open_app(self):
+        self.page.goto(BASE_URL, wait_until="networkidle")
+        self.wait_for_editor()
+
+        if self.page.locator("#welcome-overlay").is_visible():
+            self.page.locator("#start-writing").click()
+            self.page.wait_for_timeout(300)
+
+    def today(self) -> str:
+        return self.page.evaluate(
+            """() => {
+                const d = new Date();
+                const p = (n) => String(n).padStart(2, "0");
+                return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+            }"""
+        )
+
+    def seed(self, entries):
+        self.page.evaluate(
+            """async (entries) => {
+                const root = await navigator.storage.getDirectory();
+                const journal = await root.getDirectoryHandle("journal", { create: true });
+
+                for (const entry of entries) {
+                    const [year, month] = entry.iso.split("-");
+                    const yearDir = await journal.getDirectoryHandle(year, { create: true });
+                    const monthDir = await yearDir.getDirectoryHandle(month, { create: true });
+                    const file = await monthDir.getFileHandle(`${entry.iso}.md`, { create: true });
+                    const writable = await file.createWritable();
+                    await writable.write(entry.text);
+                    await writable.close();
+                }
+            }""",
+            entries,
+        )
+
+    def read_entry(self, iso: str) -> str:
+        return self.page.evaluate(
+            """async (iso) => {
+                const root = await navigator.storage.getDirectory();
+                const journal = await root.getDirectoryHandle("journal");
+                const [year, month] = iso.split("-");
+                const yearDir = await journal.getDirectoryHandle(year);
+                const monthDir = await yearDir.getDirectoryHandle(month);
+                const file = await (await monthDir.getFileHandle(`${iso}.md`)).getFile();
+                return await file.text();
+            }""",
+            iso,
+        )
+
+    def list_files(self):
+        return self.page.evaluate(
+            """async () => {
+                const root = await navigator.storage.getDirectory();
+                const journal = await root.getDirectoryHandle("journal");
+                const names = [];
+                for await (const year of journal.values()) {
+                    if (year.kind !== "directory") continue;
+                    for await (const month of year.values()) {
+                        if (month.kind !== "directory") continue;
+                        for await (const file of month.values()) {
+                            if (file.kind === "file") names.push(file.name);
+                        }
+                    }
+                }
+                return names;
+            }"""
+        )
+
+    def type_today(self, text: str):
+        if self.page.locator("#entry-editor .line").count() == 0:
+            self.wait_for_editor()
+
+        self.page.locator("#entry-editor .line").nth(0).click()
+        self.page.keyboard.type(text)
+        self.page.wait_for_timeout(900)
+
+    def test_first_run_welcome(self):
+        context = self.browser.new_context()
+        page = context.new_page()
+
+        try:
+            page.goto(BASE_URL, wait_until="networkidle")
+            page.wait_for_selector("#welcome-overlay", state="visible", timeout=15000)
+            page.locator("#start-writing").click()
+            page.wait_for_timeout(500)
+            self.assertFalse(page.locator("#welcome-overlay").is_visible())
+            self.assertEqual(page.evaluate("localStorage.getItem('dainiki-onboarded')"), "true")
+        finally:
+            context.close()
+
+    def test_write_and_reload(self):
+        today = self.today()
+        self.type_today("A quiet test entry. #test")
+        self.assertIn("Saved locally", self.page.locator("#entry-status").inner_text())
+        self.assertEqual(self.read_entry(today), "A quiet test entry. #test")
+
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(900)
+        self.assertIn("A quiet test entry.", self.page.locator("#entry-editor").inner_text())
+        self.assertEqual(self.page.locator("#today-day").inner_text(), str(dt.date.today().day))
+
+    def test_inline_past_entry_editing(self):
+        today = self.today()
+        yesterday = iso_shift(today, -1)
+        before = iso_shift(today, -2)
+
+        self.seed(
+            [
+                {"iso": yesterday, "text": "Yesterday text. #past"},
+                {"iso": before, "text": "Two days ago."},
+            ]
+        )
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(900)
+
+        self.page.locator(f'a[data-iso="{yesterday}"]').click()
+        self.page.wait_for_timeout(500)
+        self.assertEqual(self.page.locator("#timeline-entries textarea").count(), 1)
+
+        self.page.locator("#timeline-entries textarea").fill("Yesterday edited. #past")
+        self.page.wait_for_timeout(900)
+        self.page.locator("#timeline-entries .inline-done").click()
+        self.page.wait_for_timeout(800)
+
+        self.assertIn("Yesterday edited.", self.page.locator(f'a[data-iso="{yesterday}"]').inner_text())
+        self.assertEqual(self.page.locator("#today-day").inner_text(), str(dt.date.today().day))
+        self.assertEqual(self.read_entry(yesterday), "Yesterday edited. #past")
+
+    def test_search_opens_inline(self):
+        today = self.today()
+        yesterday = iso_shift(today, -1)
+
+        self.seed([{"iso": yesterday, "text": "A quiet morning with tea. #morning"}])
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(900)
+
+        self.page.keyboard.press(f"{MOD}+k")
+        self.page.wait_for_timeout(300)
+        self.page.keyboard.type("quiet morning")
+        self.page.wait_for_timeout(400)
+        self.assertGreaterEqual(self.page.locator("#search-results button").count(), 1)
+
+        self.page.keyboard.press("Enter")
+        self.page.wait_for_timeout(900)
+        self.assertEqual(self.page.locator("#timeline-entries textarea").count(), 1)
+        self.assertEqual(self.page.locator("#today-day").inner_text(), str(dt.date.today().day))
+
+    def test_tags_filter_and_calendar(self):
+        today = self.today()
+        yesterday = iso_shift(today, -1)
+        before = iso_shift(today, -2)
+
+        self.seed(
+            [
+                {"iso": yesterday, "text": "Morning one. #morning"},
+                {"iso": before, "text": "Morning two. #morning #work"},
+            ]
+        )
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(900)
+
+        self.assertIn("morning", self.page.locator("#tag-list").inner_text())
+        self.page.locator('#tag-list button:has-text("morning")').click()
+        self.page.wait_for_timeout(300)
+        self.assertTrue(self.page.locator("#active-filter").is_visible())
+
+        self.page.locator("#clear-filter").click()
+        self.page.wait_for_timeout(200)
+        self.assertFalse(self.page.locator("#active-filter").is_visible())
+
+        self.page.locator(f'#calendar button[aria-label="{yesterday}"]').click()
+        self.page.wait_for_timeout(700)
+        self.assertEqual(self.page.locator("#timeline-entries textarea").count(), 1)
+        self.assertEqual(self.page.locator("#today-day").inner_text(), str(dt.date.today().day))
+
+    def test_theme_persists(self):
+        self.page.locator("#theme-toggle").click()
+        self.page.wait_for_timeout(300)
+        theme = self.page.evaluate("document.documentElement.dataset.theme")
+        self.assertIn(theme, ("light", "dark"))
+
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(700)
+        self.assertEqual(self.page.evaluate("document.documentElement.dataset.theme"), theme)
+
+    def test_conflict_copy(self):
+        today = self.today()
+        self.type_today("original")
+        self.page.wait_for_timeout(300)
+
+        self.page.evaluate(
+            """async (iso) => {
+                const root = await navigator.storage.getDirectory();
+                const journal = await root.getDirectoryHandle("journal");
+                const [year, month] = iso.split("-");
+                const yearDir = await journal.getDirectoryHandle(year);
+                const monthDir = await yearDir.getDirectoryHandle(month);
+                const file = await monthDir.getFileHandle(`${iso}.md`);
+                const writable = await file.createWritable();
+                await writable.write("external");
+                await writable.close();
+            }""",
+            today,
+        )
+
+        self.page.locator("#entry-editor .line").nth(0).click()
+        self.page.keyboard.press("End")
+        self.page.keyboard.type(" local")
+        self.page.wait_for_timeout(1100)
+
+        self.assertIn("Conflict copy", self.page.locator("#entry-status").inner_text())
+        files = self.list_files()
+        self.assertTrue(any(".conflict-" in name for name in files), files)
+        self.assertEqual(self.read_entry(today), "external")
+
+    def test_export_and_import(self):
+        today = self.today()
+        yesterday = iso_shift(today, -1)
+        self.seed(
+            [
+                {"iso": today, "text": "Today export. #export"},
+                {"iso": yesterday, "text": "Yesterday export. #export"},
+            ]
+        )
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(900)
+
+        self.page.locator("#open-data").click()
+        self.page.wait_for_timeout(200)
+        with self.page.expect_download() as download_info:
+            self.page.locator("#export-zip").click()
+
+        download = download_info.value
+        path = os.path.join(tempfile.gettempdir(), "dainiki-e2e-export.zip")
+        download.save_as(path)
+
+        with zipfile.ZipFile(path) as archive:
+            names = archive.namelist()
+            self.assertIn(f"{today[:4]}/{today[5:7]}/{today}.md", names)
+            self.assertIn("README.md", names)
+
+        self.page.evaluate(
+            """async () => {
+                const root = await navigator.storage.getDirectory();
+                await root.removeEntry("journal", { recursive: true });
+            }"""
+        )
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(800)
+
+        self.page.locator("#open-data").click()
+        self.page.wait_for_timeout(200)
+        self.page.locator("#import-file").set_input_files(path)
+        self.page.wait_for_timeout(1800)
+
+        self.assertIn("Imported", self.page.locator("#data-status").inner_text())
+        self.assertIn("Today export.", self.page.locator("#entry-editor").inner_text())
+        self.assertGreaterEqual(self.page.locator("#timeline-entries article").count(), 1)
+
+    def test_offline_shell(self):
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(900)
+        self.page.wait_for_function(
+            "navigator.serviceWorker.controller !== null",
+            timeout=15000,
+        )
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(900)
+        self.assertTrue(self.page.evaluate("!!navigator.serviceWorker.controller"))
+
+        self.context.set_offline(True)
+        self.page.reload(wait_until="domcontentloaded")
+        self.page.wait_for_timeout(1500)
+        self.assertEqual(self.page.locator("#entry-editor").count(), 1)
+        self.context.set_offline(False)
+
+    def test_mobile_drawer(self):
+        self.page.set_viewport_size({"width": 390, "height": 844})
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(700)
+
+        self.assertFalse(self.page.locator("aside").is_visible())
+        self.page.locator("#open-sidebar").click()
+        self.page.wait_for_timeout(300)
+        self.assertTrue(self.page.locator("aside").is_visible())
+        self.assertTrue(self.page.locator("#sidebar-backdrop").is_visible())
+
+        self.page.locator("#close-sidebar").click()
+        self.page.wait_for_timeout(300)
+        self.assertFalse(self.page.locator("aside").is_visible())
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -38,6 +38,54 @@ pub async fn timeline() -> Result<impl View> {
             </div>
             search_overlay()
             data_overlay()
+            welcome_overlay()
+        </div>
+    })
+}
+
+#[component]
+pub async fn welcome_overlay() -> Result<impl View> {
+    Ok(view! {
+        <div
+            id="welcome-overlay"
+            hidden="true"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="welcome-title"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/20 px-4 backdrop-blur-sm"
+        >
+            <div class="w-full max-w-md rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-2xl">
+                <p class="font-ui text-[10px] uppercase tracking-[0.16em] text-primary">
+                    "Local-first journal"
+                </p>
+                <h2
+                    id="welcome-title"
+                    class="mt-2 font-display text-headline-md text-on-surface"
+                >
+                    "Your journal lives on this device."
+                </h2>
+                <p class="mt-3 font-journal text-journal text-on-surface-variant">
+                    "Entries are plain Markdown files in your browser's storage. They work offline, need no account, and never touch a server."
+                </p>
+                <ul class="mt-4 space-y-2 font-ui text-ui-body text-on-surface-variant">
+                    <li>"Markdown files you can export anytime"</li>
+                    <li>"Text only — no photos, audio, or video"</li>
+                    <li>"Optional encrypted sync later"</li>
+                </ul>
+                <button
+                    id="start-writing"
+                    type="button"
+                    class="mt-6 w-full rounded bg-primary px-4 py-2 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+                >
+                    "Start writing"
+                </button>
+                <p
+                    id="welcome-storage"
+                    class="mt-3 text-center font-ui text-[10px] text-on-surface-variant/60"
+                >
+                    "We'll ask the browser to protect this storage."
+                </p>
+            </div>
         </div>
     })
 }
@@ -48,6 +96,9 @@ pub async fn data_overlay() -> Result<impl View> {
         <div
             id="data-overlay"
             hidden="true"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Import and export"
             class="fixed inset-0 z-50 flex items-start justify-center bg-on-surface/20 px-4 pt-24 backdrop-blur-sm"
         >
             <div class="w-full max-w-md overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl">
@@ -116,6 +167,9 @@ pub async fn search_overlay() -> Result<impl View> {
         <div
             id="search-overlay"
             hidden="true"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Search entries"
             class="fixed inset-0 z-50 flex items-start justify-center bg-on-surface/20 px-4 pt-24 backdrop-blur-sm"
         >
             <div class="w-full max-w-xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl">
@@ -200,12 +254,16 @@ pub async fn today_entry() -> Result<impl View> {
                         class="live-editor min-h-[22rem] w-full font-journal text-journal text-on-surface"
                         contenteditable="true"
                         spellcheck="true"
+                        role="textbox"
+                        aria-multiline="true"
+                        aria-label="Journal entry"
                     ></div>
 
                     <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/30 pt-3">
                         <div
                             id="entry-status"
                             class="font-ui text-ui-label text-on-surface-variant/70"
+                            aria-live="polite"
                         >
                             "Loading…"
                         </div>
@@ -384,7 +442,9 @@ pub async fn sidebar() -> Result<impl View> {
 
                 <div class="flex items-center gap-1.5 px-1 text-on-surface-variant/60">
                     <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
-                    <span class="font-ui text-[10px]">"Stored on this device"</span>
+                    <span id="storage-status" class="font-ui text-[10px]">
+                        "Stored on this device"
+                    </span>
                 </div>
             </div>
         </aside>

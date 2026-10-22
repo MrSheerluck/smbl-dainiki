@@ -64,6 +64,8 @@ struct State {
     inline_save_timeout: Option<Timeout>,
     sidebar: Element,
     sidebar_backdrop: Element,
+    welcome_overlay: Element,
+    storage_status: Element,
     day_label: Element,
     weekday_label: Element,
     month_label: Element,
@@ -141,6 +143,8 @@ pub fn start() -> Result<(), JsValue> {
         inline_save_timeout: None,
         sidebar: element(&document, "aside")?,
         sidebar_backdrop: element(&document, "#sidebar-backdrop")?,
+        welcome_overlay: element(&document, "#welcome-overlay")?,
+        storage_status: element(&document, "#storage-status")?,
         day_label: element(&document, "#today-day")?,
         weekday_label: element(&document, "#today-weekday")?,
         month_label: element(&document, "#today-month")?,
@@ -232,7 +236,68 @@ fn toggle_theme(document: &Document) -> Result<(), JsValue> {
 async fn init(state: SharedState) -> Result<(), JsValue> {
     let iso = state.borrow().selected_iso.clone();
     load_entry(state.clone(), &iso).await?;
-    refresh(state.clone()).await
+    refresh(state.clone()).await?;
+    maybe_show_welcome(&state);
+    Ok(())
+}
+
+fn start_writing(state: SharedState) {
+    state
+        .borrow()
+        .welcome_overlay
+        .set_attribute("hidden", "true")
+        .ok();
+
+    if let Some(storage) = local_storage() {
+        storage.set_item("dainiki-onboarded", "true").ok();
+    }
+
+    let editor = state.borrow().editor.clone();
+    editor.focus().ok();
+    editor.scroll_into_view_with_bool(true);
+
+    spawn_result(request_persistent_storage(state));
+}
+
+async fn request_persistent_storage(state: SharedState) -> Result<(), JsValue> {
+    let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
+    let storage = window.navigator().storage();
+    let granted = JsFuture::from(storage.persist()?)
+        .await?
+        .as_bool()
+        .unwrap_or(false);
+
+    let message = if granted {
+        "Storage protected"
+    } else {
+        "Storage may be cleared by the browser"
+    };
+
+    state
+        .borrow()
+        .storage_status
+        .set_text_content(Some(message));
+    Ok(())
+}
+
+fn maybe_show_welcome(state: &SharedState) {
+    let has_entries = !state.borrow().entries.is_empty();
+    let onboarded = local_storage()
+        .and_then(|storage| storage.get_item("dainiki-onboarded").ok().flatten())
+        .as_deref()
+        == Some("true");
+
+    if !has_entries && !onboarded {
+        state
+            .borrow()
+            .welcome_overlay
+            .remove_attribute("hidden")
+            .ok();
+    }
+}
+
+fn local_storage() -> Option<web_sys::Storage> {
+    web_sys::window()?.local_storage().ok().flatten()
 }
 
 fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> {
@@ -542,6 +607,15 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
 
             close_search(search_result_state.clone());
             open_entry(search_result_state.clone(), iso);
+        }),
+    )?;
+
+    let start_writing_state = state.clone();
+    listen(
+        element(document, "#start-writing")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            start_writing(start_writing_state.clone());
         }),
     )?;
 

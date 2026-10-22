@@ -216,9 +216,9 @@ fn search_snippet(entry: &EntryRecord, query: &str) -> String {
 pub fn inline_editor(text: &str) -> String {
     format!(
         r#"<div class="mt-4 rounded-lg border border-outline-variant/40 bg-surface-container-low/40 p-4">
-  <textarea class="min-h-[10rem] w-full resize-y border-0 bg-transparent font-journal text-journal text-on-surface outline-none" spellcheck="true">{text}</textarea>
+  <textarea aria-label="Edit entry" class="min-h-[10rem] w-full resize-y border-0 bg-transparent font-journal text-journal text-on-surface outline-none" spellcheck="true">{text}</textarea>
   <div class="mt-3 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-2">
-    <span class="inline-status font-ui text-[10px] text-on-surface-variant/60">Editing</span>
+    <span aria-live="polite" class="inline-status font-ui text-[10px] text-on-surface-variant/60">Editing</span>
     <button type="button" class="inline-done rounded bg-primary px-3 py-1 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">
       Done
     </button>

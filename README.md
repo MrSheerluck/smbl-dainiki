@@ -55,8 +55,7 @@ The landing page is live. The local-first journal is in development:
 - No npm, no node_modules, and no client framework. The only client JS is the
   generated wasm-bindgen loader.
 
-Next: editor hardening (paste, undo, IME, multiline constructs), then search and
-themes.
+Next: local search and themes.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root

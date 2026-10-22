@@ -1,34 +1,18 @@
+mod app;
+mod layout;
+
 use topcoat::{
-    Result,
-    router::{Router, page},
-    view::{View, view},
+    asset::{AssetBundle, RouterBuilderAssetExt},
+    router::Router,
 };
 
 #[tokio::main]
 async fn main() {
-    let router = Router::builder().page(home).build();
+    let router = Router::builder()
+        .layout(layout::root)
+        .page(app::timeline)
+        .assets(AssetBundle::load().unwrap())
+        .build();
 
     topcoat::start(router).await.unwrap();
-}
-
-#[page("/")]
-async fn home() -> Result<impl View> {
-    Ok(view! {
-        <!DOCTYPE html>
-        <html lang="en">
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <title>"Dainiki"</title>
-                topcoat::dev::script()
-            </head>
-            <body>
-                <main>
-                    <p>"Local-first journal"</p>
-                    <h1>"Dainiki"</h1>
-                    <p>"The journal is being built. This is the first running slice."</p>
-                </main>
-            </body>
-        </html>
-    })
 }

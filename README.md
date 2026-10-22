@@ -52,6 +52,7 @@ The landing page is live. The local-first journal is in development:
 - Daily editor with previous/next day navigation.
 - Timeline built by scanning the stored files.
 - Live tag counts, clickable tag filters, and a calendar with entry dots.
+- Local full-text search with `⌘K`, tag matching, snippets, and keyboard navigation.
 - No npm, no node_modules, and no client framework. The only client JS is the
   generated wasm-bindgen loader.
 

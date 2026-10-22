@@ -37,6 +37,22 @@ pub async fn write_entry(iso: &str, text: &str) -> Result<(), JsValue> {
     Ok(())
 }
 
+pub async fn write_conflict(iso: &str, text: &str) -> Result<String, JsValue> {
+    let month_dir = journal_dir(iso, true).await?;
+    let stamp = js_sys::Date::now() as u64;
+    let name = format!("{iso}.conflict-{stamp}.md");
+    let file_handle = file_handle(&month_dir, &name, true).await?;
+
+    let writable: FileSystemWritableFileStream = JsFuture::from(file_handle.create_writable())
+        .await?
+        .dyn_into()?;
+
+    JsFuture::from(writable.write_with_str(text)?).await?;
+    JsFuture::from(writable.close()).await?;
+
+    Ok(name)
+}
+
 pub async fn list_entries() -> Result<Vec<(String, String)>, JsValue> {
     let root = storage_root().await?;
     let journal = match directory(&root, "journal", false).await {

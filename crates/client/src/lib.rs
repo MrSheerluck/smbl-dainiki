@@ -23,6 +23,7 @@ struct State {
     entries: Vec<EntryRecord>,
     active_tag: Option<String>,
     has_file: bool,
+    base_text: String,
     saving: bool,
     composing: bool,
     undo_stack: Vec<String>,
@@ -84,6 +85,7 @@ pub fn start() -> Result<(), JsValue> {
         entries: Vec::new(),
         active_tag: None,
         has_file: false,
+        base_text: String::new(),
         saving: false,
         composing: false,
         undo_stack: Vec::new(),
@@ -1082,6 +1084,7 @@ async fn load_entry(state: SharedState, iso: &str) -> Result<(), JsValue> {
                 state.undo_stack.clear();
                 state.redo_stack.clear();
                 state.last_snapshot = text.clone();
+                state.base_text = text.clone();
                 state.history_timeout = None;
             }
 
@@ -1101,6 +1104,7 @@ async fn load_entry(state: SharedState, iso: &str) -> Result<(), JsValue> {
             {
                 let mut state = state.borrow_mut();
                 state.has_file = false;
+                state.base_text.clear();
                 state.undo_stack.clear();
                 state.redo_stack.clear();
                 state.last_snapshot.clear();
@@ -1118,13 +1122,14 @@ async fn load_entry(state: SharedState, iso: &str) -> Result<(), JsValue> {
 }
 
 async fn save_entry(state: SharedState) -> Result<(), JsValue> {
-    let (iso, text, has_file, editor) = {
+    let (iso, text, has_file, editor, base_text) = {
         let state = state.borrow();
         (
             state.selected_iso.clone(),
             markdown::source_from_editor(&state.editor),
             state.has_file,
             state.editor.clone(),
+            state.base_text.clone(),
         )
     };
 
@@ -1140,6 +1145,95 @@ async fn save_entry(state: SharedState) -> Result<(), JsValue> {
     state.borrow_mut().saving = true;
     set_status(&state, "Saving…");
 
+    if has_file {
+        match opfs::read_entry(&iso).await {
+            Ok(Some(remote)) => {
+                if remote != base_text && remote != text {
+                    let conflict = opfs::write_conflict(&iso, &text).await;
+                    state.borrow_mut().saving = false;
+
+                    match conflict {
+                        Ok(name) => {
+                            markdown::render_document(&editor, &remote);
+
+                            let meta = parse_date(&iso).map(|date| parse_entry(&remote, date));
+                            let tags = meta.as_ref().map_or_else(String::new, |meta| {
+                                render::editor_tags(&meta.tags)
+                            });
+
+                            state.borrow().editor_tags.set_inner_html(&tags);
+                            {
+                                let mut state = state.borrow_mut();
+                                state.base_text = remote.clone();
+                                state.last_snapshot = remote;
+                                state.undo_stack.clear();
+                                state.redo_stack.clear();
+                                state.has_file = true;
+                            }
+                            set_status(&state, &format!("Conflict copy saved as {name}"));
+                            refresh(state.clone()).await?;
+                        }
+                        Err(error) => {
+                            web_sys::console::error_1(&error);
+                            set_status(&state, "Conflict copy failed");
+                        }
+                    }
+
+                    return Ok(());
+                }
+
+                if remote == text {
+                    state.borrow_mut().saving = false;
+                    state.borrow_mut().base_text = text.clone();
+
+                    let words = parse_date(&iso)
+                        .map(|date| parse_entry(&text, date).words)
+                        .unwrap_or(0);
+
+                    set_status(&state, &format!("Saved locally · {words} words"));
+                    refresh(state.clone()).await?;
+                    return Ok(());
+                }
+            }
+            Ok(None) => {
+                let conflict = opfs::write_conflict(&iso, &text).await;
+                state.borrow_mut().saving = false;
+
+                match conflict {
+                    Ok(name) => {
+                        markdown::render_document(&editor, "");
+                        state.borrow().editor_tags.set_inner_html("");
+                        {
+                            let mut state = state.borrow_mut();
+                            state.base_text.clear();
+                            state.has_file = false;
+                            state.last_snapshot.clear();
+                            state.undo_stack.clear();
+                            state.redo_stack.clear();
+                        }
+                        set_status(
+                            &state,
+                            &format!("Conflict copy saved as {name} — entry was deleted"),
+                        );
+                        refresh(state.clone()).await?;
+                    }
+                    Err(error) => {
+                        web_sys::console::error_1(&error);
+                        set_status(&state, "Conflict copy failed");
+                    }
+                }
+
+                return Ok(());
+            }
+            Err(error) => {
+                state.borrow_mut().saving = false;
+                web_sys::console::error_1(&error);
+                set_status(&state, "Could not check the file");
+                return Ok(());
+            }
+        }
+    }
+
     let result = opfs::write_entry(&iso, &text).await;
     state.borrow_mut().saving = false;
 
@@ -1152,7 +1246,11 @@ async fn save_entry(state: SharedState) -> Result<(), JsValue> {
                 .map_or_else(String::new, |meta| render::editor_tags(&meta.tags));
 
             state.borrow().editor_tags.set_inner_html(&tags);
-            state.borrow_mut().has_file = true;
+            {
+                let mut state = state.borrow_mut();
+                state.has_file = true;
+                state.base_text = text.clone();
+            }
             set_status(&state, &format!("Saved locally · {words} words"));
             refresh(state.clone()).await?;
 

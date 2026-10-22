@@ -31,6 +31,37 @@ pub async fn timeline() -> Result<impl View> {
                     </div>
                 </main>
             </div>
+            search_overlay()
+        </div>
+    })
+}
+
+#[component]
+pub async fn search_overlay() -> Result<impl View> {
+    Ok(view! {
+        <div
+            id="search-overlay"
+            hidden="true"
+            class="fixed inset-0 z-50 flex items-start justify-center bg-on-surface/20 px-4 pt-24 backdrop-blur-sm"
+        >
+            <div class="w-full max-w-xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl">
+                <input
+                    id="search-input"
+                    type="text"
+                    placeholder="Search entries…"
+                    autocomplete="off"
+                    spellcheck="false"
+                    class="w-full border-0 bg-transparent px-5 py-4 font-ui text-ui-body text-on-surface outline-none placeholder:text-on-surface-variant/50"
+                >
+                <div
+                    id="search-results"
+                    class="max-h-80 overflow-y-auto border-t border-outline-variant/40"
+                ></div>
+                <div class="flex items-center justify-between border-t border-outline-variant/40 px-5 py-2 font-ui text-[10px] text-on-surface-variant/50">
+                    <span>"Esc to close"</span>
+                    <span>"↑↓ to move · ↵ to open"</span>
+                </div>
+            </div>
         </div>
     })
 }
@@ -262,6 +293,7 @@ pub async fn topbar() -> Result<impl View> {
             </div>
 
             <button
+                id="open-search"
                 type="button"
                 class="flex w-full max-w-sm items-center gap-3 rounded-full border border-outline-variant/50 bg-surface-container-lowest px-4 py-2 text-left font-ui text-ui-body text-on-surface-variant hover:border-outline"
             >

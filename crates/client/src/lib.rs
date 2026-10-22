@@ -11,7 +11,8 @@ use time::Duration;
 use wasm_bindgen::{JsCast, JsValue, prelude::*};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{
-    ClipboardEvent, Document, Element, Event, HtmlElement, KeyboardEvent, Node,
+    ClipboardEvent, Document, Element, Event, HtmlElement, HtmlInputElement,
+    KeyboardEvent, Node,
 };
 
 struct State {
@@ -35,6 +36,11 @@ struct State {
     calendar: Element,
     active_filter: Element,
     active_filter_label: Element,
+    search_overlay: Element,
+    search_input: HtmlInputElement,
+    search_results: Element,
+    search_matches: Vec<String>,
+    search_selected: usize,
     day_label: Element,
     weekday_label: Element,
     month_label: Element,
@@ -91,6 +97,11 @@ pub fn start() -> Result<(), JsValue> {
         calendar: element(&document, "#calendar")?,
         active_filter: element(&document, "#active-filter")?,
         active_filter_label: element(&document, "#active-filter-label")?,
+        search_overlay: element(&document, "#search-overlay")?,
+        search_input: query::<HtmlInputElement>(&document, "#search-input")?,
+        search_results: element(&document, "#search-results")?,
+        search_matches: Vec::new(),
+        search_selected: 0,
         day_label: element(&document, "#today-day")?,
         weekday_label: element(&document, "#today-weekday")?,
         month_label: element(&document, "#today-month")?,
@@ -309,6 +320,80 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
+    let open_state = state.clone();
+    listen(
+        element(document, "#open-search")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            open_search(open_state.clone());
+        }),
+    )?;
+
+    let global_state = state.clone();
+    listen(
+        document.as_ref(),
+        "keydown",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_global_keydown(global_state.clone(), event);
+        }),
+    )?;
+
+    let overlay_state = state.clone();
+    listen(
+        state.borrow().search_overlay.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            let Some(target) = target_element(&event) else {
+                return;
+            };
+
+            if target.id() == "search-overlay" {
+                close_search(overlay_state.clone());
+            }
+        }),
+    )?;
+
+    let search_input_state = state.clone();
+    listen(
+        state.borrow().search_input.as_ref(),
+        "input",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            search_input_state.borrow_mut().search_selected = 0;
+            render_search_results(search_input_state.clone());
+        }),
+    )?;
+
+    let search_key_state = state.clone();
+    listen(
+        state.borrow().search_input.as_ref(),
+        "keydown",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_search_keydown(search_key_state.clone(), event);
+        }),
+    )?;
+
+    let search_result_state = state.clone();
+    listen(
+        state.borrow().search_results.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            let Some(target) = target_element(&event) else {
+                return;
+            };
+
+            let Ok(Some(result)) = target.closest("[data-iso]") else {
+                return;
+            };
+
+            let Some(iso) = result.get_attribute("data-iso") else {
+                return;
+            };
+
+            close_search(search_result_state.clone());
+            spawn_result(select_date(search_result_state.clone(), iso));
+        }),
+    )?;
+
     let visibility_state = state.clone();
     let visibility_document = document.clone();
     listen(
@@ -371,6 +456,106 @@ fn handle_keydown(state: SharedState, document: &Document, event: Event) {
 
     if event.key() == "Backspace" && merge_line(state, document) {
         event.prevent_default();
+    }
+}
+
+fn handle_global_keydown(state: SharedState, event: Event) {
+    let Ok(event) = event.dyn_into::<KeyboardEvent>() else {
+        return;
+    };
+
+    if event.is_composing() {
+        return;
+    }
+
+    let modifier = event.meta_key() || event.ctrl_key();
+
+    if modifier && event.key().eq_ignore_ascii_case("k") {
+        event.prevent_default();
+        open_search(state);
+    }
+}
+
+fn open_search(state: SharedState) {
+    let overlay = state.borrow().search_overlay.clone();
+    overlay.remove_attribute("hidden").ok();
+
+    let input = state.borrow().search_input.clone();
+    input.focus().ok();
+    input.select();
+    state.borrow_mut().search_selected = 0;
+    render_search_results(state);
+}
+
+fn close_search(state: SharedState) {
+    let overlay = state.borrow().search_overlay.clone();
+    overlay.set_attribute("hidden", "true").ok();
+
+    let editor = state.borrow().editor.clone();
+    editor.focus().ok();
+}
+
+fn render_search_results(state: SharedState) {
+    let (html, matches, selected) = {
+        let state = state.borrow();
+        render::search_results(
+            &state.entries,
+            &state.search_input.value(),
+            state.search_selected,
+        )
+    };
+
+    let mut state = state.borrow_mut();
+    state.search_results.set_inner_html(&html);
+    state.search_matches = matches;
+    state.search_selected = selected;
+}
+
+fn handle_search_keydown(state: SharedState, event: Event) {
+    let Ok(event) = event.dyn_into::<KeyboardEvent>() else {
+        return;
+    };
+
+    if event.is_composing() {
+        return;
+    }
+
+    match event.key().as_str() {
+        "Escape" => {
+            event.prevent_default();
+            close_search(state);
+        }
+        "ArrowDown" => {
+            event.prevent_default();
+            let length = state.borrow().search_matches.len();
+
+            if length > 0 {
+                let mut borrowed = state.borrow_mut();
+                borrowed.search_selected = (borrowed.search_selected + 1).min(length - 1);
+                drop(borrowed);
+                render_search_results(state.clone());
+            }
+        }
+        "ArrowUp" => {
+            event.prevent_default();
+            let mut borrowed = state.borrow_mut();
+            borrowed.search_selected = borrowed.search_selected.saturating_sub(1);
+            drop(borrowed);
+            render_search_results(state.clone());
+        }
+        "Enter" => {
+            event.prevent_default();
+            let iso = {
+                let state = state.borrow();
+                state.search_matches.get(state.search_selected).cloned()
+            };
+
+            if let Some(iso) = iso {
+                close_search(state.clone());
+                spawn_result(select_date(state, iso));
+            }
+        }
+        _ => {}
     }
 }
 
@@ -919,7 +1104,7 @@ async fn refresh(state: SharedState) -> Result<(), JsValue> {
             for (iso, text) in raw_entries {
                 if let Some(date) = parse_date(&iso) {
                     let meta = parse_entry(&text, date);
-                    entries.push(EntryRecord { iso, meta });
+                    entries.push(EntryRecord { iso, text, meta });
                 }
             }
 

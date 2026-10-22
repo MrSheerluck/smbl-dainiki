@@ -3,11 +3,12 @@ use std::{
     fmt::Write,
 };
 
-use dainiki_core::{Date, EntryMeta, month_year, weekday_name};
+use dainiki_core::{Date, EntryMeta, month_short, month_year, weekday_name};
 use time::Month;
 
 pub struct EntryRecord {
     pub iso: String,
+    pub text: String,
     pub meta: EntryMeta,
 }
 
@@ -76,6 +77,118 @@ pub fn timeline(entries: &[EntryRecord], selected_iso: &str, active_tag: Option<
     }
 
     html
+}
+
+pub fn search_results(
+    entries: &[EntryRecord],
+    query: &str,
+    selected: usize,
+) -> (String, Vec<String>, usize) {
+    let query = query.trim().to_lowercase();
+    let matches: Vec<&EntryRecord> = entries
+        .iter()
+        .filter(|entry| {
+            query.is_empty()
+                || entry.text.to_lowercase().contains(&query)
+                || entry.meta.tags.iter().any(|tag| tag.contains(&query))
+        })
+        .take(20)
+        .collect();
+
+    if matches.is_empty() {
+        return (
+            r#"<p class="px-5 py-6 font-ui text-ui-label text-on-surface-variant/60">No results.</p>"#
+                .to_string(),
+            Vec::new(),
+            0,
+        );
+    }
+
+    let selected = selected.min(matches.len() - 1);
+    let mut html = String::new();
+    let mut isos = Vec::new();
+
+    for (index, entry) in matches.iter().enumerate() {
+        let date = entry.meta.date;
+        let selected_class = if index == selected {
+            " bg-surface-container-high"
+        } else {
+            ""
+        };
+
+        let mut tags = String::new();
+        for tag in &entry.meta.tags {
+            let _ = write!(
+                tags,
+                r#"<span class="font-mono text-[10px] text-secondary/70">#{}</span>"#,
+                escape_html(tag)
+            );
+        }
+
+        let _ = write!(
+            html,
+            r##"<button type="button" data-iso="{iso}" aria-selected="{aria}" class="block w-full border-b border-outline-variant/30 px-5 py-3 text-left last:border-0 hover:bg-surface-container{selected_class}">
+  <div class="flex items-baseline justify-between gap-3">
+    <span class="font-display text-sm text-on-surface">{date_label}</span>
+    <span class="font-ui text-[10px] text-on-surface-variant/50">{words} words</span>
+  </div>
+  <p class="mt-1 font-journal text-journal text-on-surface-variant">{snippet}</p>
+  <div class="mt-2 flex flex-wrap gap-2">{tags}</div>
+</button>"##,
+            iso = escape_html(&entry.iso),
+            aria = if index == selected { "true" } else { "false" },
+            selected_class = selected_class,
+            date_label = format!(
+                "{}, {} {}, {}",
+                weekday_name(date),
+                month_short(date),
+                date.day(),
+                date.year()
+            ),
+            words = entry.meta.words,
+            snippet = escape_html(&search_snippet(entry, query.as_str())),
+            tags = tags,
+        );
+
+        isos.push(entry.iso.clone());
+    }
+
+    (html, isos, selected)
+}
+
+fn search_snippet(entry: &EntryRecord, query: &str) -> String {
+    if query.is_empty() {
+        return entry.meta.excerpt.clone();
+    }
+
+    let lower = entry.text.to_lowercase();
+    let Some(position) = lower.find(query) else {
+        return entry.meta.excerpt.clone();
+    };
+
+    let mut start = position.saturating_sub(40);
+
+    while start > 0 && !entry.text.is_char_boundary(start) {
+        start -= 1;
+    }
+
+    let mut end = (position + query.len() + 80).min(entry.text.len());
+
+    while end < entry.text.len() && !entry.text.is_char_boundary(end) {
+        end += 1;
+    }
+
+    let mut snippet = entry.text[start..end].replace('\n', " ");
+
+    if start > 0 {
+        snippet.insert(0, '…');
+    }
+
+    if end < entry.text.len() {
+        snippet.push('…');
+    }
+
+    snippet
 }
 
 pub fn editor_tags(tags: &[String]) -> String {

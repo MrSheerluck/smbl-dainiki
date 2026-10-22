@@ -61,8 +61,9 @@ The landing page is live. The local-first journal is in development:
 - No npm, no node_modules, and no client framework. The only JS is the generated
   wasm-bindgen loader and the browser-mandated service worker.
 - Installable PWA with an offline app shell.
+- Incremental timeline pagination and a mobile sidebar drawer.
 
-Next: timeline pagination and mobile polish.
+Next: local end-to-end tests and final hardening.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root

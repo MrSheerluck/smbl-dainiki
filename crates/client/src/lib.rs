@@ -1,5 +1,5 @@
+mod markdown;
 mod opfs;
-mod preview;
 mod render;
 
 use std::{cell::RefCell, future::Future, rc::Rc};
@@ -10,7 +10,7 @@ use render::EntryRecord;
 use time::Duration;
 use wasm_bindgen::{JsCast, JsValue, prelude::*};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{Document, Element, Event, HtmlTextAreaElement};
+use web_sys::{Document, Element, Event, HtmlElement, KeyboardEvent, Node};
 
 struct State {
     selected_iso: String,
@@ -21,8 +21,7 @@ struct State {
     active_tag: Option<String>,
     has_file: bool,
     saving: bool,
-    editor: HtmlTextAreaElement,
-    preview: Element,
+    editor: HtmlElement,
     status: Element,
     editor_tags: Element,
     timeline: Element,
@@ -36,7 +35,6 @@ struct State {
     today_button: Element,
     next_day_button: Element,
     save_timeout: Option<Timeout>,
-    preview_timeout: Option<Timeout>,
 }
 
 type SharedState = Rc<RefCell<State>>;
@@ -61,7 +59,7 @@ pub fn start() -> Result<(), JsValue> {
         .document()
         .ok_or_else(|| JsValue::from_str("no document"))?;
 
-    let editor = query::<HtmlTextAreaElement>(&document, "#entry-editor")?;
+    let editor = query::<HtmlElement>(&document, "#entry-editor")?;
     let today_iso = today_iso();
     let (calendar_year, calendar_month) = month_parts(&today_iso);
 
@@ -75,7 +73,6 @@ pub fn start() -> Result<(), JsValue> {
         has_file: false,
         saving: false,
         editor,
-        preview: element(&document, "#entry-preview")?,
         status: element(&document, "#entry-status")?,
         editor_tags: element(&document, "#entry-tags")?,
         timeline: element(&document, "#timeline-entries")?,
@@ -89,7 +86,6 @@ pub fn start() -> Result<(), JsValue> {
         today_button: element(&document, "#today-button")?,
         next_day_button: element(&document, "#next-day")?,
         save_timeout: None,
-        preview_timeout: None,
     }));
 
     bind_events(&state, &document)?;
@@ -108,12 +104,12 @@ async fn init(state: SharedState) -> Result<(), JsValue> {
 
 fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> {
     let editor = state.borrow().editor.clone();
+
     let input_state = state.clone();
     listen(
         editor.as_ref(),
         "input",
         Closure::<dyn FnMut(Event)>::new(move |_| {
-            schedule_preview(input_state.clone());
             schedule_save(input_state.clone());
         }),
     )?;
@@ -124,6 +120,26 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         "blur",
         Closure::<dyn FnMut(Event)>::new(move |_| {
             spawn_result(save_entry(blur_state.clone()));
+        }),
+    )?;
+
+    let key_state = state.clone();
+    let key_document = document.clone();
+    listen(
+        editor.as_ref(),
+        "keydown",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_keydown(key_state.clone(), &key_document, event);
+        }),
+    )?;
+
+    let selection_state = state.clone();
+    let selection_document = document.clone();
+    listen(
+        document.as_ref(),
+        "selectionchange",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            update_active_line(selection_state.clone(), &selection_document);
         }),
     )?;
 
@@ -267,27 +283,228 @@ fn listen(
     Ok(())
 }
 
+fn handle_keydown(state: SharedState, document: &Document, event: Event) {
+    let Ok(event) = event.dyn_into::<KeyboardEvent>() else {
+        return;
+    };
+
+    if event.key() == "Enter" {
+        event.prevent_default();
+        split_line(state, document);
+        return;
+    }
+
+    if event.key() == "Backspace" && merge_line(state, document) {
+        event.prevent_default();
+    }
+}
+
+fn update_active_line(state: SharedState, document: &Document) {
+    let editor = state.borrow().editor.clone();
+    let new_line = active_line(document);
+    let old_line = editor.query_selector(".line.active").ok().flatten();
+
+    if old_line == new_line {
+        return;
+    }
+
+    if let Some(old) = old_line {
+        let source = old.text_content().unwrap_or_default();
+        markdown::render_line_into(&old, &source, false);
+    }
+
+    if let Some(new) = new_line {
+        new.class_list().add_1("active").ok();
+    }
+}
+
+fn split_line(state: SharedState, document: &Document) {
+    let Some(line) = active_line(document) else {
+        return;
+    };
+
+    let source = line.text_content().unwrap_or_default();
+    let offset = caret_offset(document, &line).unwrap_or_else(|| utf16_len(&source));
+    let (before, after) = split_at_utf16(&source, offset);
+
+    markdown::render_line_into(&line, before, false);
+
+    let Ok(new_line) = document.create_element("div") else {
+        return;
+    };
+
+    markdown::render_line_into(&new_line, after, true);
+
+    let Some(parent) = line.parent_node() else {
+        return;
+    };
+
+    let reference = line.next_sibling();
+    if parent
+        .insert_before(new_line.as_ref(), reference.as_ref())
+        .is_err()
+    {
+        return;
+    }
+
+    place_caret(document, &new_line, true);
+    schedule_save(state);
+}
+
+fn merge_line(state: SharedState, document: &Document) -> bool {
+    let Some(line) = active_line(document) else {
+        return false;
+    };
+
+    if caret_offset(document, &line) != Some(0) {
+        return false;
+    }
+
+    let Some(previous) = line.previous_element_sibling() else {
+        return false;
+    };
+
+    let mut source = previous.text_content().unwrap_or_default();
+    source.push_str(&line.text_content().unwrap_or_default());
+
+    markdown::render_line_into(&previous, &source, true);
+    line.remove();
+    place_caret(document, &previous, false);
+    schedule_save(state);
+    true
+}
+
+fn active_line(document: &Document) -> Option<Element> {
+    let selection = document.get_selection().ok()??;
+    let node = selection.anchor_node()?;
+
+    markdown::line_of(&node)
+}
+
+fn caret_offset(document: &Document, line: &Element) -> Option<usize> {
+    let selection = document.get_selection().ok()??;
+    let anchor = selection.anchor_node()?;
+    let offset = selection.anchor_offset();
+    let mut total = 0;
+    let mut found = false;
+
+    walk_caret(
+        line.as_ref(),
+        &anchor,
+        offset,
+        &mut total,
+        &mut found,
+    );
+
+    found.then_some(total)
+}
+
+fn walk_caret(
+    node: &Node,
+    target: &Node,
+    target_offset: u32,
+    total: &mut usize,
+    found: &mut bool,
+) {
+    if *found {
+        return;
+    }
+
+    if node.is_same_node(Some(target)) {
+        if node.node_type() == Node::TEXT_NODE {
+            *total += target_offset as usize;
+        } else {
+            let mut child = node.first_child();
+            let mut index = 0;
+
+            while let Some(current) = child {
+                if index >= target_offset {
+                    break;
+                }
+
+                *total += utf16_len(&current.text_content().unwrap_or_default());
+                index += 1;
+                child = current.next_sibling();
+            }
+        }
+
+        *found = true;
+        return;
+    }
+
+    let mut child = node.first_child();
+
+    while let Some(current) = child {
+        walk_caret(&current, target, target_offset, total, found);
+
+        if *found {
+            return;
+        }
+
+        if current.node_type() == Node::TEXT_NODE {
+            *total += utf16_len(&current.text_content().unwrap_or_default());
+        }
+
+        child = current.next_sibling();
+    }
+}
+
+fn place_caret(document: &Document, line: &Element, at_start: bool) {
+    let Ok(range) = document.create_range() else {
+        return;
+    };
+
+    if range.select_node_contents(line.as_ref()).is_err() {
+        return;
+    }
+
+    range.collapse_with_to_start(at_start);
+
+    let Ok(Some(selection)) = document.get_selection() else {
+        return;
+    };
+
+    selection.remove_all_ranges().ok();
+    selection.add_range(&range).ok();
+}
+
+fn split_at_utf16(source: &str, offset: usize) -> (&str, &str) {
+    let mut units = 0;
+
+    for (index, ch) in source.char_indices() {
+        if units >= offset {
+            return source.split_at(index);
+        }
+
+        units += ch.len_utf16();
+    }
+
+    (source, "")
+}
+
+fn utf16_len(value: &str) -> usize {
+    value.encode_utf16().count()
+}
+
 async fn load_entry(state: SharedState, iso: &str) -> Result<(), JsValue> {
     let result = opfs::read_entry(iso).await;
 
     match result {
         Ok(Some(text)) => {
-            state.borrow().editor.set_value(&text);
-            preview::render(&state.borrow().preview, &text);
+            markdown::render_document(&state.borrow().editor, &text);
 
             let meta = parse_date(iso).map(|date| parse_entry(&text, date));
             let words = meta.as_ref().map_or(0, |meta| meta.words);
-            let tags = meta.as_ref().map_or_else(String::new, |meta| {
-                render::editor_tags(&meta.tags)
-            });
+            let tags = meta
+                .as_ref()
+                .map_or_else(String::new, |meta| render::editor_tags(&meta.tags));
 
             state.borrow().editor_tags.set_inner_html(&tags);
             state.borrow_mut().has_file = true;
             set_status(&state, &format!("Loaded · {words} words"));
         }
         Ok(None) => {
-            state.borrow().editor.set_value("");
-            preview::render(&state.borrow().preview, "");
+            markdown::render_document(&state.borrow().editor, "");
             state.borrow().editor_tags.set_inner_html("");
             state.borrow_mut().has_file = false;
             set_status(&state, "New entry — not saved yet");
@@ -306,7 +523,7 @@ async fn save_entry(state: SharedState) -> Result<(), JsValue> {
         let state = state.borrow();
         (
             state.selected_iso.clone(),
-            state.editor.value(),
+            markdown::source_from_editor(&state.editor),
             state.has_file,
             state.editor.clone(),
         )
@@ -331,16 +548,16 @@ async fn save_entry(state: SharedState) -> Result<(), JsValue> {
         Ok(()) => {
             let meta = parse_date(&iso).map(|date| parse_entry(&text, date));
             let words = meta.as_ref().map_or(0, |meta| meta.words);
-            let tags = meta.as_ref().map_or_else(String::new, |meta| {
-                render::editor_tags(&meta.tags)
-            });
+            let tags = meta
+                .as_ref()
+                .map_or_else(String::new, |meta| render::editor_tags(&meta.tags));
 
             state.borrow().editor_tags.set_inner_html(&tags);
             state.borrow_mut().has_file = true;
             set_status(&state, &format!("Saved locally · {words} words"));
             refresh(state.clone()).await?;
 
-            if editor.value() != text {
+            if markdown::source_from_editor(&editor) != text {
                 schedule_save(state.clone());
             }
         }
@@ -542,21 +759,6 @@ fn update_labels(state: &SharedState) {
         state.today_button.remove_attribute("hidden").ok();
         state.next_day_button.remove_attribute("disabled").ok();
     }
-}
-
-fn schedule_preview(state: SharedState) {
-    let next_state = state.clone();
-    let mut state = state.borrow_mut();
-
-    state.preview_timeout = None;
-    state.preview_timeout = Some(Timeout::new(120, move || {
-        let (preview, text) = {
-            let state = next_state.borrow();
-            (state.preview.clone(), state.editor.value())
-        };
-
-        preview::render(&preview, &text);
-    }));
 }
 
 fn schedule_save(state: SharedState) {

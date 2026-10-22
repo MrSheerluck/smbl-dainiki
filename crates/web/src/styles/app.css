@@ -57,80 +57,73 @@
   }
 }
 
-.entry-preview {
+
+.live-editor {
   color: var(--color-on-surface);
   font-family: var(--font-journal);
   font-size: 0.95rem;
   line-height: 1.625rem;
+  outline: none;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
-.entry-preview > :first-child {
-  margin-top: 0;
+.live-editor .line {
+  min-height: 1.625rem;
+  outline: none;
 }
 
-.entry-preview > :last-child {
-  margin-bottom: 0;
+.live-editor .marker {
+  display: none;
+  color: color-mix(in oklab, var(--color-on-surface-variant) 55%, transparent);
 }
 
-.entry-preview p {
-  margin: 0 0 1rem;
+.live-editor .line.active .marker {
+  display: inline;
 }
 
-.entry-preview h1,
-.entry-preview h2,
-.entry-preview h3,
-.entry-preview h4,
-.entry-preview h5,
-.entry-preview h6 {
-  margin: 1.5rem 0 0.75rem;
+.live-editor .md-h1,
+.live-editor .md-h2,
+.live-editor .md-h3,
+.live-editor .md-h4,
+.live-editor .md-h5,
+.live-editor .md-h6 {
   font-family: var(--font-display);
   font-weight: 400;
   line-height: 1.25;
 }
 
-.entry-preview h1 {
+.live-editor .md-h1 {
   font-size: 2rem;
 }
 
-.entry-preview h2 {
+.live-editor .md-h2 {
   font-size: 1.5rem;
 }
 
-.entry-preview h3 {
+.live-editor .md-h3 {
   font-size: 1.25rem;
 }
 
-.entry-preview h4,
-.entry-preview h5,
-.entry-preview h6 {
+.live-editor .md-h4,
+.live-editor .md-h5,
+.live-editor .md-h6 {
   font-size: 1.05rem;
 }
 
-.entry-preview strong {
+.live-editor .md-strong {
   font-weight: 600;
 }
 
-.entry-preview em {
+.live-editor .md-em {
   font-style: italic;
 }
 
-.entry-preview a {
-  color: var(--color-primary);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+.live-editor .md-strike {
+  text-decoration: line-through;
 }
 
-.entry-preview blockquote {
-  margin: 1rem 0;
-  border-left: 2px solid
-    color-mix(in oklab, var(--color-secondary) 45%, transparent);
-  padding-left: 1rem;
-  color: var(--color-on-surface-variant);
-  font-style: italic;
-}
-
-.entry-preview code {
+.live-editor .md-code-inline {
   border-radius: 0.125rem;
   background: var(--color-surface-container);
   padding: 0.08rem 0.25rem;
@@ -138,58 +131,33 @@
   font-size: 0.86em;
 }
 
-.entry-preview pre {
-  margin: 1rem 0;
-  overflow-x: auto;
-  border-radius: 0.25rem;
-  background: var(--color-surface-container-low);
-  padding: 1rem;
+.live-editor .md-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.live-editor .md-tag {
+  color: var(--color-secondary);
+}
+
+.live-editor .md-quote {
+  border-left: 2px solid
+    color-mix(in oklab, var(--color-secondary) 45%, transparent);
+  padding-left: 1rem;
+  color: var(--color-on-surface-variant);
+}
+
+.live-editor .md-hr {
+  border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.live-editor .line.active.md-hr {
+  border-bottom: 0;
+}
+
+.live-editor .md-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85rem;
-  line-height: 1.5rem;
-}
-
-.entry-preview pre code {
-  background: transparent;
-  padding: 0;
-}
-
-.entry-preview ul,
-.entry-preview ol {
-  margin: 0 0 1rem;
-  padding-left: 1.25rem;
-}
-
-.entry-preview ul {
-  list-style: disc;
-}
-
-.entry-preview ol {
-  list-style: decimal;
-}
-
-.entry-preview li {
-  margin: 0.25rem 0;
-}
-
-.entry-preview hr {
-  margin: 1.5rem 0;
-  border: 0;
-  border-top: 1px solid var(--color-outline-variant);
-}
-
-.entry-preview input[type="checkbox"] {
-  margin-right: 0.35rem;
-  accent-color: var(--color-primary);
-}
-
-.entry-preview img {
-  display: none;
-}
-
-.entry-preview:empty::before {
-  content: "Preview appears here…";
-  color: color-mix(in oklab, var(--color-on-surface-variant) 45%, transparent);
-  font-family: var(--font-ui);
-  font-size: 0.75rem;
+  background: var(--color-surface-container-low);
 }

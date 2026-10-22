@@ -1,0 +1,17 @@
+[package]
+name = "dainiki-wasm"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "WASM bindings for dainiki-core"
+license = "MIT"
+repository = "https://github.com/MrSheerluck/smbl-dainiki"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+dainiki-core = { path = "../core" }
+wasm-bindgen = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

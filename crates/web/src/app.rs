@@ -71,32 +71,45 @@ pub async fn date_column(day: &str, weekday: &str, month: &str) -> Result<impl V
 pub async fn today_entry() -> Result<impl View> {
     Ok(view! {
         <article class="flex gap-3 sm:gap-5">
-            date_column(day: "22", weekday: "Today", month: "Oct 2026")
+            <div class="w-14 shrink-0 pt-1 text-right">
+                <span
+                    id="today-day"
+                    class="block font-display text-[1.9rem] leading-none text-on-surface/70 sm:text-[2.2rem]"
+                >
+                    "22"
+                </span>
+                <span class="mt-1 block whitespace-nowrap font-ui text-[8px] uppercase tracking-wide text-on-surface-variant/70 sm:text-[9px]">
+                    "Today"
+                </span>
+                <span
+                    id="today-month"
+                    class="mt-0.5 block font-ui text-[8px] text-on-surface-variant/50 sm:text-[9px]"
+                >
+                    "Oct 2026"
+                </span>
+            </div>
+
             <div class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6">
                 <span class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"></span>
                 <div class="rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm sm:p-6">
-                    <h1 class="font-display text-headline-md tracking-tight text-on-surface">
-                        "The slow return of morning fog"
-                    </h1>
-                    <p class="mt-1 font-journal text-journal italic text-on-surface-variant">
-                        "Before the sun cleared the ridgeline…"
-                    </p>
+                    <textarea
+                        id="entry-editor"
+                        class="min-h-[22rem] w-full resize-none border-0 bg-transparent font-journal text-journal text-on-surface outline-none placeholder:text-on-surface-variant/40"
+                        placeholder="Write today's entry…"
+                        spellcheck="true"
+                    ></textarea>
 
-                    <div class="mt-5 space-y-4 font-journal text-journal text-on-surface">
-                        <p>
-                            "Before the sun cleared the ridgeline, the entire gorge lay suspended under a pale river vapor. Walking the bamboo path at this hour is an exercise in acoustic subtraction: only the steady, hollow knocking of towering culms overhead."
-                        </p>
-                        <blockquote class="border-l-2 border-secondary/40 py-1 pl-4 font-journal text-journal-lg italic text-on-surface-variant">
-                            "The day did not ask to be optimized. It asked to be noticed."
-                        </blockquote>
-                        <p>
-                            "I stopped for roasted tea by the hearth, grateful for an unhurried morning. A few lines before the inbox opens. A small record of what the light was doing, and what I was thinking while it did it."
-                        </p>
-                    </div>
-
-                    <div class="mt-5 flex flex-wrap items-center gap-3">
-                        tag_label(label: "#morning")
-                        tag_label(label: "#reflections")
+                    <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/30 pt-3">
+                        <div
+                            id="entry-status"
+                            class="font-ui text-ui-label text-on-surface-variant/70"
+                        >
+                            "Loading…"
+                        </div>
+                        <div
+                            id="entry-tags"
+                            class="flex flex-wrap items-center gap-3"
+                        ></div>
                     </div>
                 </div>
             </div>

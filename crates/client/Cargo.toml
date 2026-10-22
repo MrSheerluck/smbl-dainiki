@@ -37,6 +37,7 @@ web-sys = { version = "0.3", features = [
     "FileSystemWritableFileStream",
     "HtmlElement",
     "HtmlInputElement",
+    "HtmlTextAreaElement",
     "KeyboardEvent",
     "MediaQueryList",
     "Navigator",

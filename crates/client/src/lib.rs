@@ -12,7 +12,7 @@ use wasm_bindgen::{JsCast, JsValue, prelude::*};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{
     ClipboardEvent, Document, Element, Event, HtmlElement, HtmlInputElement,
-    KeyboardEvent, Node,
+    HtmlTextAreaElement, KeyboardEvent, Node,
 };
 
 struct State {
@@ -42,6 +42,14 @@ struct State {
     search_results: Element,
     search_matches: Vec<String>,
     search_selected: usize,
+    inline_iso: Option<String>,
+    inline_base: String,
+    inline_link: Option<Element>,
+    inline_container: Option<Element>,
+    inline_textarea: Option<HtmlTextAreaElement>,
+    inline_status: Option<Element>,
+    inline_saving: bool,
+    inline_save_timeout: Option<Timeout>,
     day_label: Element,
     weekday_label: Element,
     month_label: Element,
@@ -104,6 +112,14 @@ pub fn start() -> Result<(), JsValue> {
         search_results: element(&document, "#search-results")?,
         search_matches: Vec::new(),
         search_selected: 0,
+        inline_iso: None,
+        inline_base: String::new(),
+        inline_link: None,
+        inline_container: None,
+        inline_textarea: None,
+        inline_status: None,
+        inline_saving: false,
+        inline_save_timeout: None,
         day_label: element(&document, "#today-day")?,
         weekday_label: element(&document, "#today-weekday")?,
         month_label: element(&document, "#today-month")?,
@@ -245,6 +261,17 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
+    let focus_state = state.clone();
+    listen(
+        editor.as_ref(),
+        "mousedown",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            if focus_state.borrow().inline_iso.is_some() {
+                spawn_result(finish_inline_edit(focus_state.clone(), true));
+            }
+        }),
+    )?;
+
     let key_state = state.clone();
     let key_document = document.clone();
     listen(
@@ -315,7 +342,7 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
             };
 
             event.prevent_default();
-            spawn_result(select_date(timeline_state.clone(), iso));
+            spawn_result(start_inline_edit(timeline_state.clone(), iso));
         }),
     )?;
 
@@ -342,7 +369,17 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
             };
 
             if let Some(iso) = day.get_attribute("data-date") {
-                spawn_result(select_date(calendar_state.clone(), iso));
+                let exists = calendar_state
+                    .borrow()
+                    .entries
+                    .iter()
+                    .any(|entry| entry.iso == iso);
+
+                if exists {
+                    open_entry(calendar_state.clone(), iso);
+                } else {
+                    spawn_result(select_date(calendar_state.clone(), iso));
+                }
             }
         }),
     )?;
@@ -465,7 +502,7 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
             };
 
             close_search(search_result_state.clone());
-            spawn_result(select_date(search_result_state.clone(), iso));
+            open_entry(search_result_state.clone(), iso);
         }),
     )?;
 
@@ -627,7 +664,7 @@ fn handle_search_keydown(state: SharedState, event: Event) {
 
             if let Some(iso) = iso {
                 close_search(state.clone());
-                spawn_result(select_date(state, iso));
+                open_entry(state, iso);
             }
         }
         _ => {}
@@ -1171,7 +1208,7 @@ async fn save_entry(state: SharedState) -> Result<(), JsValue> {
                                 state.has_file = true;
                             }
                             set_status(&state, &format!("Conflict copy saved as {name}"));
-                            refresh(state.clone()).await?;
+                            refresh_if_no_inline(state.clone()).await?;
                         }
                         Err(error) => {
                             web_sys::console::error_1(&error);
@@ -1191,7 +1228,7 @@ async fn save_entry(state: SharedState) -> Result<(), JsValue> {
                         .unwrap_or(0);
 
                     set_status(&state, &format!("Saved locally · {words} words"));
-                    refresh(state.clone()).await?;
+                    refresh_if_no_inline(state.clone()).await?;
                     return Ok(());
                 }
             }
@@ -1215,7 +1252,7 @@ async fn save_entry(state: SharedState) -> Result<(), JsValue> {
                             &state,
                             &format!("Conflict copy saved as {name} — entry was deleted"),
                         );
-                        refresh(state.clone()).await?;
+                        refresh_if_no_inline(state.clone()).await?;
                     }
                     Err(error) => {
                         web_sys::console::error_1(&error);
@@ -1252,7 +1289,7 @@ async fn save_entry(state: SharedState) -> Result<(), JsValue> {
                 state.base_text = text.clone();
             }
             set_status(&state, &format!("Saved locally · {words} words"));
-            refresh(state.clone()).await?;
+            refresh_if_no_inline(state.clone()).await?;
 
             if markdown::source_from_editor(&editor) != text {
                 schedule_save(state.clone());
@@ -1300,6 +1337,14 @@ async fn refresh(state: SharedState) -> Result<(), JsValue> {
             web_sys::console::error_1(&error);
             set_status(&state, "Could not scan journal");
         }
+    }
+
+    Ok(())
+}
+
+async fn refresh_if_no_inline(state: SharedState) -> Result<(), JsValue> {
+    if state.borrow().inline_iso.is_none() {
+        refresh(state).await?;
     }
 
     Ok(())
@@ -1353,7 +1398,309 @@ fn set_active_tag(state: SharedState, tag: Option<String>) {
     render_ui(state);
 }
 
+fn open_entry(state: SharedState, iso: String) {
+    if state.borrow().selected_iso == iso {
+        spawn_result(finish_inline_edit(state.clone(), true));
+
+        let editor = state.borrow().editor.clone();
+        editor.focus().ok();
+        editor.scroll_into_view_with_bool(true);
+        return;
+    }
+
+    let timeline = state.borrow().timeline.clone();
+    let selector = format!("a[data-iso=\"{iso}\"]");
+    let mut link = timeline.query_selector(&selector).ok().flatten();
+
+    if link.is_none() {
+        state.borrow_mut().active_tag = None;
+        render_ui(state.clone());
+        link = timeline.query_selector(&selector).ok().flatten();
+    }
+
+    if let Some(link) = link {
+        link.scroll_into_view_with_bool(true);
+        spawn_result(start_inline_edit(state, iso));
+    } else {
+        spawn_result(select_date(state, iso));
+    }
+}
+
+async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValue> {
+    if state.borrow().inline_iso.as_deref() == Some(iso.as_str()) {
+        return Ok(());
+    }
+
+    finish_inline_edit(state.clone(), true).await?;
+
+    if state.borrow().inline_iso.is_some() {
+        return Ok(());
+    }
+
+    save_entry(state.clone()).await?;
+
+    let (text, timeline) = {
+        let state = state.borrow();
+        let text = state
+            .entries
+            .iter()
+            .find(|entry| entry.iso == iso)
+            .map(|entry| entry.text.clone())
+            .unwrap_or_default();
+
+        (text, state.timeline.clone())
+    };
+
+    let Some(link) = timeline.query_selector(&format!("a[data-iso=\"{iso}\"]"))? else {
+        return Ok(());
+    };
+
+    let document = timeline
+        .owner_document()
+        .ok_or_else(|| JsValue::from_str("no document"))?;
+    let container = document.create_element("div")?;
+    container.set_inner_html(&render::inline_editor(&text));
+
+    let Some(parent) = link.parent_node() else {
+        return Ok(());
+    };
+
+    let reference = link.next_sibling();
+    parent.insert_before(container.as_ref(), reference.as_ref())?;
+    link.set_attribute("hidden", "true")?;
+
+    let textarea: HtmlTextAreaElement = container
+        .query_selector("textarea")?
+        .ok_or_else(|| JsValue::from_str("missing inline textarea"))?
+        .dyn_into()?;
+    let status = container
+        .query_selector(".inline-status")?
+        .ok_or_else(|| JsValue::from_str("missing inline status"))?;
+    let done = container
+        .query_selector(".inline-done")?
+        .ok_or_else(|| JsValue::from_str("missing inline done"))?;
+
+    let input_state = state.clone();
+    listen(
+        textarea.as_ref(),
+        "input",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            schedule_inline_save(input_state.clone());
+        }),
+    )?;
+
+    let done_state = state.clone();
+    listen(
+        done.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            spawn_result(finish_inline_edit(done_state.clone(), true));
+        }),
+    )?;
+
+    let key_state = state.clone();
+    listen(
+        textarea.as_ref(),
+        "keydown",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_inline_keydown(key_state.clone(), event);
+        }),
+    )?;
+
+    let length = textarea.value().encode_utf16().count() as u32;
+    textarea.set_selection_range(length, length).ok();
+
+    {
+        let mut state = state.borrow_mut();
+        state.inline_iso = Some(iso);
+        state.inline_base = text;
+        state.inline_link = Some(link);
+        state.inline_container = Some(container);
+        state.inline_textarea = Some(textarea.clone());
+        state.inline_status = Some(status);
+        state.inline_saving = false;
+        state.inline_save_timeout = None;
+    }
+
+    textarea.focus().ok();
+    Ok(())
+}
+
+async fn finish_inline_edit(state: SharedState, save: bool) -> Result<(), JsValue> {
+    if state.borrow().inline_iso.is_none() {
+        return Ok(());
+    }
+
+    if save && !save_inline(state.clone()).await? {
+        return Ok(());
+    }
+
+    let (container, link) = {
+        let mut state = state.borrow_mut();
+        let container = state.inline_container.take();
+        let link = state.inline_link.take();
+
+        state.inline_iso = None;
+        state.inline_base.clear();
+        state.inline_textarea = None;
+        state.inline_status = None;
+        state.inline_saving = false;
+        state.inline_save_timeout = None;
+
+        (container, link)
+    };
+
+    if let Some(container) = container {
+        container.remove();
+    }
+
+    if let Some(link) = link {
+        link.remove_attribute("hidden").ok();
+    }
+
+    refresh(state).await?;
+    Ok(())
+}
+
+async fn save_inline(state: SharedState) -> Result<bool, JsValue> {
+    let (iso, text, base, textarea, status) = {
+        let state = state.borrow();
+        let Some(iso) = state.inline_iso.clone() else {
+            return Ok(true);
+        };
+        let Some(textarea) = state.inline_textarea.clone() else {
+            return Ok(true);
+        };
+
+        (
+            iso,
+            textarea.value(),
+            state.inline_base.clone(),
+            textarea,
+            state.inline_status.clone(),
+        )
+    };
+
+    if text == base {
+        set_inline_status(status.as_ref(), "Saved");
+        return Ok(true);
+    }
+
+    if state.borrow().inline_saving {
+        return Ok(false);
+    }
+
+    state.borrow_mut().inline_saving = true;
+    set_inline_status(status.as_ref(), "Saving…");
+
+    let result = opfs::read_entry(&iso).await;
+
+    let outcome = match result {
+        Ok(Some(remote)) if remote != base && remote != text => {
+            let conflict = opfs::write_conflict(&iso, &text).await;
+
+            match conflict {
+                Ok(name) => {
+                    textarea.set_value(&remote);
+                    state.borrow_mut().inline_base = remote;
+                    set_inline_status(status.as_ref(), &format!("Conflict copy saved as {name}"));
+                    true
+                }
+                Err(error) => {
+                    web_sys::console::error_1(&error);
+                    set_inline_status(status.as_ref(), "Conflict copy failed");
+                    false
+                }
+            }
+        }
+        Ok(Some(remote)) if remote == text => {
+            state.borrow_mut().inline_base = text;
+            set_inline_status(status.as_ref(), "Saved locally");
+            true
+        }
+        Ok(None) => {
+            let conflict = opfs::write_conflict(&iso, &text).await;
+
+            match conflict {
+                Ok(name) => {
+                    textarea.set_value("");
+                    state.borrow_mut().inline_base.clear();
+                    set_inline_status(
+                        status.as_ref(),
+                        &format!("Conflict copy saved as {name} — entry was deleted"),
+                    );
+                    true
+                }
+                Err(error) => {
+                    web_sys::console::error_1(&error);
+                    set_inline_status(status.as_ref(), "Conflict copy failed");
+                    false
+                }
+            }
+        }
+        Ok(Some(_)) => match opfs::write_entry(&iso, &text).await {
+            Ok(()) => {
+                state.borrow_mut().inline_base = text;
+                set_inline_status(status.as_ref(), "Saved locally");
+                true
+            }
+            Err(error) => {
+                web_sys::console::error_1(&error);
+                set_inline_status(status.as_ref(), "Save failed");
+                false
+            }
+        },
+        Err(error) => {
+            web_sys::console::error_1(&error);
+            set_inline_status(status.as_ref(), "Could not check the file");
+            false
+        }
+    };
+
+    state.borrow_mut().inline_saving = false;
+    Ok(outcome)
+}
+
+fn schedule_inline_save(state: SharedState) {
+    if let Some(status) = state.borrow().inline_status.as_ref() {
+        status.set_text_content(Some("Unsaved changes"));
+    }
+
+    let next_state = state.clone();
+    let mut state = state.borrow_mut();
+
+    state.inline_save_timeout = None;
+    state.inline_save_timeout = Some(Timeout::new(400, move || {
+        spawn_result(async move { save_inline(next_state).await.map(|_| ()) });
+    }));
+}
+
+fn set_inline_status(status: Option<&Element>, text: &str) {
+    if let Some(status) = status {
+        status.set_text_content(Some(text));
+    }
+}
+
+fn handle_inline_keydown(state: SharedState, event: Event) {
+    let Ok(event) = event.dyn_into::<KeyboardEvent>() else {
+        return;
+    };
+
+    if event.is_composing() {
+        return;
+    }
+
+    let modifier = event.meta_key() || event.ctrl_key();
+
+    if event.key() == "Escape" || (modifier && event.key() == "Enter") {
+        event.prevent_default();
+        spawn_result(finish_inline_edit(state, true));
+    }
+}
+
 async fn select_date(state: SharedState, iso: String) -> Result<(), JsValue> {
+    finish_inline_edit(state.clone(), true).await?;
+
     if state.borrow().selected_iso == iso {
         return Ok(());
     }

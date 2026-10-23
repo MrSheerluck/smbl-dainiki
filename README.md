@@ -177,7 +177,7 @@ manual sign-off:
 - Installable PWA with an offline app shell.
 - Incremental timeline pagination and a mobile sidebar drawer.
 - First-run onboarding with a persistent-storage request.
-- Twelve local journal browser tests covering storage, editing, search, themes,
+- Thirteen local journal browser tests covering storage, editing, search, themes,
   conflicts, import/export, offline mode, and mobile.
 
 Accounts, auth, billing, and encrypted sync are working: email/password signup,
@@ -193,7 +193,7 @@ client syncs recent entries first (30 by default), supports an explicit
 writes local `.conflict-<timestamp>.md` copies that can be reviewed, restored,
 downloaded, or deleted in the app, and propagates encrypted entry deletions as
 tombstones. An optional diff3 mode automatically merges non-overlapping edits;
-overlapping edits still become conflict copies. Paid devices remember the sync key after the first passphrase setup or unlock, so sync stays on automatically; **Forget this device** removes the local key. The full suite has 31 browser tests.
+overlapping edits still become conflict copies. Paid devices remember the sync key after the first passphrase setup or unlock, so sync stays on automatically; **Forget this device** removes the local key. The full suite has 32 browser tests.
 
 Local billing runs in mock mode by default. Real checkout uses Dodo test or live
 mode with two subscription products and a webhook endpoint. No free trial; the

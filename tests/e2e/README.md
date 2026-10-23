@@ -48,6 +48,7 @@ Journal (`test_journal.py`):
 - tag counts/filtering and calendar date selection
 - year/month/day archive navigation
 - light/dark theme persistence
+- sidebar search and settings (theme, journal size, spellcheck)
 - external-change conflict copies
 - export zip, clear OPFS, import zip
 - service worker offline shell

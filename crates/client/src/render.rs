@@ -60,8 +60,8 @@ pub fn timeline(
     <span class="mt-0.5 block font-ui text-[9px] text-on-surface-variant/50 sm:text-[10px]">{month}</span>
   </div>
   <div class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-5">
-    <span class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"></span>
-    <div data-entry-card="true" data-iso="{iso}" role="link" tabindex="0" aria-label="Open the entry for {weekday}, {month} {day}" class="block cursor-text rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)] transition-colors hover:border-outline-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-6">
+    <span class="absolute -left-2 top-7 h-px w-3 bg-outline-variant/60"></span>
+    <div data-entry-card="true" data-iso="{iso}" role="link" tabindex="0" aria-label="Open the entry for {weekday}, {month} {day}" class="entry-card block cursor-text rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)] transition-colors hover:border-outline-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-6">
       {body}
       <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3">{tags}</div>
@@ -355,7 +355,7 @@ pub fn calendar(
 
         if has_entry && !is_selected {
             class.push_str(
-                " after:absolute after:bottom-0.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-primary",
+                " font-semibold text-secondary underline decoration-secondary/40 decoration-1 underline-offset-4",
             );
         }
 
@@ -454,7 +454,7 @@ pub fn conflict_panel(conflicts: &[ConflictCopy], entries: &[EntryRecord]) -> St
                 r#"<details class="group rounded-xl border border-outline-variant/40 bg-surface-container-lowest/70"{open}>
   <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
     <span class="flex items-center gap-2 font-ui text-ui-label text-on-surface">
-      <span class="text-secondary">◐</span>
+      <span class="inline-block h-3 w-0.5 bg-secondary"></span>
       <span>Conflict copy · {time}</span>
     </span>
     <span class="font-ui text-[10px] text-on-surface-variant/50">{count}</span>
@@ -645,7 +645,7 @@ pub fn archive(
 
         if has_entry && !is_selected {
             class.push_str(
-                " after:absolute after:bottom-0.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-secondary",
+                " font-semibold text-secondary underline decoration-secondary/50 decoration-1 underline-offset-4",
             );
         }
 

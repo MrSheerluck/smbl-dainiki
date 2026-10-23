@@ -298,6 +298,49 @@ class DainikiE2E(unittest.TestCase):
         self.assertEqual(self.page.locator("#timeline-entries .inline-live").count(), 1)
         self.assertEqual(self.page.locator("#today-day").inner_text(), str(dt.date.today().day))
 
+    def test_sidebar_search_and_settings(self):
+        self.page.locator("#open-search-sidebar").click()
+        self.page.wait_for_timeout(300)
+        self.assertTrue(self.page.locator("#search-overlay").is_visible())
+        self.page.keyboard.press("Escape")
+        self.page.wait_for_timeout(200)
+
+        self.page.locator("#open-settings").click()
+        self.page.wait_for_timeout(300)
+        self.assertTrue(self.page.locator("#settings-overlay").is_visible())
+        self.page.locator('[data-setting-theme="dark"]').click()
+        self.page.locator('[data-setting-size="large"]').click()
+        self.page.locator("#setting-spellcheck").uncheck()
+        self.page.wait_for_timeout(500)
+
+        self.assertEqual(self.page.evaluate("document.documentElement.dataset.theme"), "dark")
+        self.assertEqual(
+            self.page.evaluate("document.documentElement.dataset.editorSize"),
+            "large",
+        )
+        self.assertEqual(
+            self.page.locator("#entry-editor").get_attribute("spellcheck"),
+            "false",
+        )
+
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(800)
+        self.assertEqual(self.page.evaluate("document.documentElement.dataset.theme"), "dark")
+        self.assertEqual(
+            self.page.evaluate("document.documentElement.dataset.editorSize"),
+            "large",
+        )
+        self.assertEqual(
+            self.page.locator("#entry-editor").get_attribute("spellcheck"),
+            "false",
+        )
+
+        self.page.locator("#open-settings").click()
+        self.page.wait_for_timeout(200)
+        self.page.locator('[data-settings-action="archive"]').click()
+        self.page.wait_for_timeout(300)
+        self.assertTrue(self.page.locator("#archive-overlay").is_visible())
+
     def test_theme_persists(self):
         self.page.locator("#theme-toggle").click()
         self.page.wait_for_timeout(300)

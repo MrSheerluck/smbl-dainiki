@@ -390,3 +390,245 @@ html[data-theme="dark"] .theme-icon-moon {
   font-size: 0.85rem;
   background: var(--color-surface-container-low);
 }
+
+#sync-label[data-sync-state="on"],
+#sync-label[data-sync-state="busy"] {
+  color: var(--color-primary);
+}
+
+#sync-label[data-sync-state="setup"] {
+  color: var(--color-secondary);
+}
+
+#sync-label[data-sync-state="off"] {
+  color: color-mix(in oklab, var(--color-on-surface-variant) 88%, transparent);
+}
+
+.settings-choice {
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-xl);
+  background: transparent;
+  padding: 0.45rem 0.5rem;
+  color: var(--color-on-surface-variant);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.settings-choice[aria-pressed="true"] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.settings-link {
+  display: block;
+  border: 1px solid color-mix(in oklab, var(--color-outline-variant) 65%, transparent);
+  border-radius: var(--radius-xl);
+  padding: 0.5rem 0.6rem;
+  color: var(--color-on-surface);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-align: left;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.settings-link:hover {
+  background: var(--color-surface-container);
+  border-color: var(--color-outline-variant);
+}
+
+html[data-editor-size="compact"] .live-editor {
+  font-size: 1rem;
+  line-height: 1.75rem;
+}
+
+html[data-editor-size="compact"] .live-editor .line {
+  min-height: 1.75rem;
+}
+
+html[data-editor-size="large"] .live-editor {
+  font-size: 1.18rem;
+  line-height: 2.05rem;
+}
+
+html[data-editor-size="large"] .live-editor .line {
+  min-height: 2.05rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  .app-sidebar {
+    animation: app-sidebar-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .app-topbar {
+    animation: app-topbar-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .app-main {
+    animation: app-main-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .entry-card {
+    transition:
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 220ms ease,
+      box-shadow 220ms ease;
+  }
+
+  .entry-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 36px -28px rgba(44, 42, 41, 0.4);
+  }
+
+  .overlay-backdrop {
+    animation: backdrop-in 180ms ease both;
+  }
+
+  .overlay-card {
+    animation: overlay-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  button:not(:disabled) {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      transform 160ms ease;
+  }
+
+  button:not(:disabled):active {
+    transform: translateY(1px) scale(0.995);
+  }
+
+  .settings-choice,
+  .settings-link {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      transform 160ms ease;
+  }
+
+  .settings-choice:hover,
+  .settings-link:hover {
+    transform: translateY(-1px);
+  }
+
+  .sidebar-action {
+    position: relative;
+  }
+
+  .sidebar-action::after {
+    content: "";
+    position: absolute;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.15rem;
+    height: 1px;
+    background: var(--color-primary);
+    opacity: 0.35;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .sidebar-action:hover::after {
+    transform: scaleX(1);
+  }
+
+  details[open] > div {
+    animation: details-in 220ms ease both;
+  }
+
+  .live-editor .marker {
+    transition: opacity 160ms ease;
+  }
+}
+
+@keyframes app-sidebar-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes app-topbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes app-main-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes details-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

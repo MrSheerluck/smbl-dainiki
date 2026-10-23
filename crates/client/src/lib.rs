@@ -71,6 +71,7 @@ struct State {
     conflict_indicator: Element,
     conflict_count: Element,
     conflict_status: Element,
+    settings_overlay: Element,
     import_file: HtmlInputElement,
     import_folder: HtmlInputElement,
     inline_iso: Option<String>,
@@ -99,7 +100,6 @@ struct State {
     sync_content: Element,
     sync_label: Element,
     sync_detail: Element,
-    sync_dot: Element,
     sync_status: Option<sync::SyncStatus>,
     sync_signed_out: bool,
     sync_keys: Option<sync::SyncKeys>,
@@ -186,6 +186,7 @@ pub fn start() -> Result<(), JsValue> {
         conflict_indicator: element(&document, "#open-conflicts")?,
         conflict_count: element(&document, "#conflict-count")?,
         conflict_status: element(&document, "#conflict-status")?,
+        settings_overlay: element(&document, "#settings-overlay")?,
         import_file: query::<HtmlInputElement>(&document, "#import-file")?,
         import_folder: query::<HtmlInputElement>(&document, "#import-folder-input")?,
         inline_iso: None,
@@ -214,7 +215,6 @@ pub fn start() -> Result<(), JsValue> {
         sync_content: element(&document, "#sync-content")?,
         sync_label: element(&document, "#sync-label")?,
         sync_detail: element(&document, "#sync-detail")?,
-        sync_dot: element(&document, "#sync-dot")?,
         sync_status: None,
         sync_signed_out: false,
         sync_keys: None,
@@ -233,6 +233,7 @@ pub fn start() -> Result<(), JsValue> {
     }));
 
     init_theme(&document)?;
+    init_editor_preferences(&state, &document)?;
     bind_events(&state, &document)?;
     update_labels(&state);
 
@@ -250,24 +251,44 @@ async fn register_service_worker() -> Result<(), JsValue> {
     Ok(())
 }
 
+fn theme_mode() -> String {
+    if let Some(storage) = local_storage() {
+        if let Ok(Some(mode)) = storage.get_item("dainiki-theme-mode") {
+            if matches!(mode.as_str(), "light" | "dark" | "system") {
+                return mode;
+            }
+        }
+        if let Ok(Some(mode)) = storage.get_item("dainiki-theme") {
+            if matches!(mode.as_str(), "light" | "dark") {
+                return mode;
+            }
+        }
+    }
+
+    "system".to_string()
+}
+
+fn resolved_theme(mode: &str) -> &'static str {
+    match mode {
+        "light" => "light",
+        "dark" => "dark",
+        _ => {
+            let system_dark = web_sys::window()
+                .and_then(|window| {
+                    window
+                        .match_media("(prefers-color-scheme: dark)")
+                        .ok()
+                        .flatten()
+                })
+                .is_some_and(|query| query.matches());
+            if system_dark { "dark" } else { "light" }
+        }
+    }
+}
+
 fn init_theme(document: &Document) -> Result<(), JsValue> {
-    let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
-    let saved = window
-        .local_storage()?
-        .and_then(|storage| storage.get_item("dainiki-theme").ok().flatten());
-
-    let system_dark = window
-        .match_media("(prefers-color-scheme: dark)")?
-        .is_some_and(|query| query.matches());
-
-    let theme = match saved.as_deref() {
-        Some("dark") => "dark",
-        Some("light") => "light",
-        _ if system_dark => "dark",
-        _ => "light",
-    };
-
-    apply_theme(document, theme)
+    let mode = theme_mode();
+    apply_theme(document, resolved_theme(&mode))
 }
 
 fn apply_theme(document: &Document, theme: &str) -> Result<(), JsValue> {
@@ -287,20 +308,28 @@ fn apply_theme(document: &Document, theme: &str) -> Result<(), JsValue> {
         button.set_attribute("aria-pressed", if theme == "dark" { "true" } else { "false" })?;
     }
 
+    let _ = render_settings(document);
     Ok(())
 }
 
-fn toggle_theme(document: &Document) -> Result<(), JsValue> {
+fn set_theme_mode(document: &Document, mode: &str) -> Result<(), JsValue> {
+    let next = resolved_theme(mode);
+    if let Some(storage) = local_storage() {
+        storage.set_item("dainiki-theme-mode", mode)?;
+        storage.set_item("dainiki-theme", next)?;
+    }
+    transition_theme(document, next)
+}
+
+fn transition_theme(document: &Document, next: &str) -> Result<(), JsValue> {
     let root = document
         .document_element()
         .ok_or_else(|| JsValue::from_str("no document element"))?;
     let current = root
         .get_attribute("data-theme")
         .unwrap_or_else(|| "light".to_string());
-    let next = if current == "dark" { "light" } else { "dark" };
-
-    if let Some(storage) = local_storage() {
-        storage.set_item("dainiki-theme", next)?;
+    if current == next {
+        return apply_theme(document, next);
     }
 
     let reduce_motion = web_sys::window()
@@ -329,6 +358,196 @@ fn toggle_theme(document: &Document) -> Result<(), JsValue> {
     }
 
     apply_theme(document, next)
+}
+
+fn toggle_theme(document: &Document) -> Result<(), JsValue> {
+    let root = document
+        .document_element()
+        .ok_or_else(|| JsValue::from_str("no document element"))?;
+    let current = root
+        .get_attribute("data-theme")
+        .unwrap_or_else(|| "light".to_string());
+    let next = if current == "dark" { "light" } else { "dark" };
+    set_theme_mode(document, next)
+}
+
+fn editor_size() -> String {
+    local_storage()
+        .and_then(|storage| storage.get_item("dainiki-editor-size").ok().flatten())
+        .filter(|size| matches!(size.as_str(), "compact" | "default" | "large"))
+        .unwrap_or_else(|| "default".to_string())
+}
+
+fn apply_editor_size(document: &Document, size: &str) -> Result<(), JsValue> {
+    let root = document
+        .document_element()
+        .ok_or_else(|| JsValue::from_str("no document element"))?;
+    let size = if matches!(size, "compact" | "large") {
+        size
+    } else {
+        "default"
+    };
+    root.set_attribute("data-editor-size", size)
+}
+
+fn spellcheck_enabled() -> bool {
+    local_storage()
+        .and_then(|storage| storage.get_item("dainiki-spellcheck").ok().flatten())
+        .as_deref()
+        != Some("false")
+}
+
+fn apply_spellcheck(state: &SharedState, enabled: bool) {
+    state
+        .borrow()
+        .editor
+        .set_attribute("spellcheck", if enabled { "true" } else { "false" })
+        .ok();
+    if let Some(editor) = state.borrow().inline_editor.clone() {
+        editor
+            .set_attribute("spellcheck", if enabled { "true" } else { "false" })
+            .ok();
+    }
+}
+
+fn init_editor_preferences(state: &SharedState, document: &Document) -> Result<(), JsValue> {
+    apply_editor_size(document, &editor_size())?;
+    apply_spellcheck(state, spellcheck_enabled());
+    render_settings(document)
+}
+
+fn set_spellcheck_from_input(state: SharedState) {
+    let Some(document) = web_sys::window().and_then(|window| window.document()) else {
+        return;
+    };
+    let enabled = document
+        .query_selector("#setting-spellcheck")
+        .ok()
+        .flatten()
+        .and_then(|input| input.dyn_into::<HtmlInputElement>().ok())
+        .is_some_and(|input| input.checked());
+    if let Some(storage) = local_storage() {
+        storage
+            .set_item("dainiki-spellcheck", if enabled { "true" } else { "false" })
+            .ok();
+    }
+    apply_spellcheck(&state, enabled);
+}
+
+fn render_settings(document: &Document) -> Result<(), JsValue> {
+    let mode = theme_mode();
+    let size = editor_size();
+    let spellcheck = spellcheck_enabled();
+
+    for value in ["light", "dark", "system"] {
+        if let Ok(Some(button)) = document.query_selector(&format!(
+            "[data-setting-theme=\"{value}\"]"
+        )) {
+            button.set_attribute(
+                "aria-pressed",
+                if value == mode { "true" } else { "false" },
+            )?;
+        }
+    }
+
+    for value in ["compact", "default", "large"] {
+        if let Ok(Some(button)) = document.query_selector(&format!(
+            "[data-setting-size=\"{value}\"]"
+        )) {
+            button.set_attribute(
+                "aria-pressed",
+                if value == size { "true" } else { "false" },
+            )?;
+        }
+    }
+
+    if let Ok(Some(input)) = document.query_selector("#setting-spellcheck") {
+        if let Ok(input) = input.dyn_into::<HtmlInputElement>() {
+            input.set_checked(spellcheck);
+        }
+    }
+
+    Ok(())
+}
+
+fn open_settings(state: SharedState) {
+    if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+        let _ = render_settings(&document);
+    }
+    state
+        .borrow()
+        .settings_overlay
+        .remove_attribute("hidden")
+        .ok();
+
+    if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+        if let Ok(Some(button)) = document.query_selector("#close-settings") {
+            if let Ok(button) = button.dyn_into::<HtmlElement>() {
+                button.focus().ok();
+            }
+        }
+    }
+}
+
+fn close_settings(state: SharedState) {
+    state
+        .borrow()
+        .settings_overlay
+        .set_attribute("hidden", "true")
+        .ok();
+
+    if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+        if let Ok(Some(button)) = document.query_selector("#open-settings") {
+            if let Ok(button) = button.dyn_into::<HtmlElement>() {
+                button.focus().ok();
+            }
+        }
+    }
+}
+
+fn handle_settings_click(state: SharedState, event: Event) {
+    let Some(target) = target_element(&event) else {
+        return;
+    };
+
+    if let Ok(Some(button)) = target.closest("[data-setting-theme]") {
+        if let Some(mode) = button.get_attribute("data-setting-theme") {
+            if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+                let _ = set_theme_mode(&document, &mode);
+                let _ = render_settings(&document);
+            }
+        }
+        return;
+    }
+
+    if let Ok(Some(button)) = target.closest("[data-setting-size]") {
+        if let Some(size) = button.get_attribute("data-setting-size") {
+            if let Some(storage) = local_storage() {
+                storage.set_item("dainiki-editor-size", &size).ok();
+            }
+            if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+                let _ = apply_editor_size(&document, &size);
+                let _ = render_settings(&document);
+            }
+        }
+        return;
+    }
+
+    let Ok(Some(action)) = target.closest("[data-settings-action]") else {
+        return;
+    };
+    let Some(action) = action.get_attribute("data-settings-action") else {
+        return;
+    };
+
+    close_settings(state.clone());
+    match action.as_str() {
+        "archive" => open_archive(state),
+        "sync" => open_sync(state),
+        "data" => open_data(state),
+        "conflicts" => open_conflicts(state),
+        _ => {}
+    }
 }
 
 async fn init(state: SharedState) -> Result<(), JsValue> {
@@ -937,6 +1156,80 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
+    let sidebar_search_state = state.clone();
+    listen(
+        element(document, "#open-search-sidebar")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            open_search(sidebar_search_state.clone());
+        }),
+    )?;
+
+    let open_settings_state = state.clone();
+    listen(
+        element(document, "#open-settings")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            open_settings(open_settings_state.clone());
+        }),
+    )?;
+
+    let close_settings_state = state.clone();
+    listen(
+        element(document, "#close-settings")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            close_settings(close_settings_state.clone());
+        }),
+    )?;
+
+    let settings_backdrop_state = state.clone();
+    listen(
+        state.borrow().settings_overlay.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            let Some(target) = target_element(&event) else {
+                return;
+            };
+            if target.id() == "settings-overlay" {
+                close_settings(settings_backdrop_state.clone());
+            }
+        }),
+    )?;
+
+    let settings_action_state = state.clone();
+    listen(
+        state.borrow().settings_overlay.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_settings_click(settings_action_state.clone(), event);
+        }),
+    )?;
+
+    let settings_key_state = state.clone();
+    listen(
+        state.borrow().settings_overlay.as_ref(),
+        "keydown",
+        Closure::<dyn FnMut(Event)>::new(move |event: Event| {
+            let Ok(event) = event.dyn_into::<KeyboardEvent>() else {
+                return;
+            };
+            if event.key() == "Escape" {
+                event.prevent_default();
+                close_settings(settings_key_state.clone());
+            }
+        }),
+    )?;
+
+    let spellcheck_state = state.clone();
+    listen(
+        element(document, "#setting-spellcheck")?.as_ref(),
+        "change",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            set_spellcheck_from_input(spellcheck_state.clone());
+        }),
+    )?;
+
     let open_data_state = state.clone();
     listen(
         element(document, "#open-data")?.as_ref(),
@@ -1123,6 +1416,12 @@ fn handle_global_keydown(state: SharedState, event: Event) {
     if modifier && event.key().eq_ignore_ascii_case("k") {
         event.prevent_default();
         open_search(state);
+        return;
+    }
+
+    if modifier && event.key() == "," {
+        event.prevent_default();
+        open_settings(state);
     }
 }
 
@@ -2647,22 +2946,9 @@ fn update_sync_affordance(state: SharedState) {
         }
     };
 
-    let dot_class = match dot {
-        "on" => "h-1.5 w-1.5 shrink-0 rounded-full border border-primary bg-primary",
-        "busy" => {
-            "h-1.5 w-1.5 shrink-0 animate-pulse rounded-full border border-primary bg-primary"
-        }
-        "setup" => {
-            "h-1.5 w-1.5 shrink-0 rounded-full border border-secondary bg-secondary"
-        }
-        _ => {
-            "h-1.5 w-1.5 shrink-0 rounded-full border border-outline-variant bg-transparent"
-        }
-    };
-
     state.borrow().sync_label.set_text_content(Some(label));
+    state.borrow().sync_label.set_attribute("data-sync-state", dot).ok();
     state.borrow().sync_detail.set_text_content(Some(&detail));
-    state.borrow().sync_dot.set_class_name(dot_class);
 }
 
 fn input_value(document: &Document, selector: &str) -> String {
@@ -3955,6 +4241,12 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
         .query_selector(".inline-status")?
         .ok_or_else(|| JsValue::from_str("missing inline status"))?;
     markdown::render_document(&editor, &text);
+    editor
+        .set_attribute(
+            "spellcheck",
+            if spellcheck_enabled() { "true" } else { "false" },
+        )
+        .ok();
 
     let input_state = state.clone();
     listen(

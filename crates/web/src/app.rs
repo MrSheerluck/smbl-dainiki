@@ -7,7 +7,9 @@ use topcoat::{
 #[page("/")]
 pub async fn timeline() -> Result<impl View> {
     Ok(view! {
-        <div class="flex min-h-screen bg-surface lg:h-screen lg:overflow-hidden">
+        <div
+            class="app-shell flex min-h-screen bg-surface lg:h-screen lg:overflow-hidden"
+        >
             sidebar()
             <div
                 id="sidebar-backdrop"
@@ -17,7 +19,7 @@ pub async fn timeline() -> Result<impl View> {
             <div class="flex min-w-0 flex-1 flex-col lg:min-h-0">
                 topbar()
                 <main
-                    class="flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:min-h-0 lg:overflow-y-auto lg:px-10"
+                    class="app-main flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:min-h-0 lg:overflow-y-auto lg:px-10"
                 >
                     <div class="mx-auto max-w-5xl space-y-8">
                         today_entry()
@@ -50,6 +52,7 @@ pub async fn timeline() -> Result<impl View> {
             sync_overlay()
             archive_overlay()
             conflict_overlay()
+            settings_overlay()
         </div>
     })
 }
@@ -63,10 +66,10 @@ pub async fn welcome_overlay() -> Result<impl View> {
             role="dialog"
             aria-modal="true"
             aria-labelledby="welcome-title"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
+            class="overlay-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
         >
             <div
-                class="w-full max-w-md rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-2xl"
+                class="overlay-card w-full max-w-md rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-2xl"
             >
                 <p class="font-ui text-[10px] uppercase tracking-[0.16em] text-primary">
                     "Local-first journal"
@@ -112,10 +115,10 @@ pub async fn sync_overlay() -> Result<impl View> {
             role="dialog"
             aria-modal="true"
             aria-labelledby="sync-title"
-            class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
+            class="overlay-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
         >
             <div
-                class="w-full max-w-lg overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+                class="overlay-card w-full max-w-lg overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
             >
                 <div
                     class="flex items-center justify-between border-b border-outline-variant/40 px-5 py-3"
@@ -153,6 +156,182 @@ pub async fn sync_overlay() -> Result<impl View> {
 }
 
 #[component]
+pub async fn settings_overlay() -> Result<impl View> {
+    Ok(view! {
+        <div
+            id="settings-overlay"
+            hidden="true"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-title"
+            class="overlay-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-20 backdrop-blur-sm sm:pt-24"
+        >
+            <div
+                class="overlay-card w-full max-w-lg overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+            >
+                <div
+                    class="flex items-start justify-between gap-4 border-b border-outline-variant/40 px-5 py-4"
+                >
+                    <div>
+                        <p
+                            class="font-ui text-[9px] uppercase tracking-[0.16em] text-primary"
+                        >
+                            "Preferences"
+                        </p>
+                        <h2
+                            id="settings-title"
+                            class="mt-1 font-display text-xl text-on-surface"
+                        >
+                            "Settings"
+                        </h2>
+                    </div>
+                    <button
+                        id="close-settings"
+                        type="button"
+                        aria-label="Close settings"
+                        class="rounded px-2 py-1 font-ui text-ui-label text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                    >
+                        "×"
+                    </button>
+                </div>
+
+                <div class="max-h-[calc(100vh-11rem)] space-y-6 overflow-y-auto p-5">
+                    <section>
+                        <h3
+                            class="font-ui text-[9px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant/60"
+                        >
+                            "Appearance"
+                        </h3>
+                        <div class="mt-2 grid grid-cols-3 gap-2">
+                            <button
+                                type="button"
+                                data-setting-theme="light"
+                                aria-pressed="false"
+                                class="settings-choice"
+                            >
+                                "Light"
+                            </button>
+                            <button
+                                type="button"
+                                data-setting-theme="dark"
+                                aria-pressed="false"
+                                class="settings-choice"
+                            >
+                                "Dark"
+                            </button>
+                            <button
+                                type="button"
+                                data-setting-theme="system"
+                                aria-pressed="false"
+                                class="settings-choice"
+                            >
+                                "System"
+                            </button>
+                        </div>
+                        <p class="mt-2 font-ui text-[10px] text-on-surface-variant/60">
+                            "System follows your device appearance."
+                        </p>
+                    </section>
+
+                    <section>
+                        <h3
+                            class="font-ui text-[9px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant/60"
+                        >
+                            "Journal type"
+                        </h3>
+                        <div class="mt-2 grid grid-cols-3 gap-2">
+                            <button
+                                type="button"
+                                data-setting-size="compact"
+                                aria-pressed="false"
+                                class="settings-choice"
+                            >
+                                "Compact"
+                            </button>
+                            <button
+                                type="button"
+                                data-setting-size="default"
+                                aria-pressed="false"
+                                class="settings-choice"
+                            >
+                                "Default"
+                            </button>
+                            <button
+                                type="button"
+                                data-setting-size="large"
+                                aria-pressed="false"
+                                class="settings-choice"
+                            >
+                                "Large"
+                            </button>
+                        </div>
+                    </section>
+
+                    <section class="flex items-start justify-between gap-4">
+                        <div>
+                            <h3
+                                class="font-ui text-[9px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant/60"
+                            >
+                                "Spellcheck"
+                            </h3>
+                            <p
+                                class="mt-1 font-ui text-[10px] text-on-surface-variant/60"
+                            >
+                                "Check spelling while you write."
+                            </p>
+                        </div>
+                        <input
+                            id="setting-spellcheck"
+                            type="checkbox"
+                            class="mt-1 h-4 w-4 accent-primary"
+                        >
+                    </section>
+
+                    <div class="border-t border-outline-variant/40 pt-4">
+                        <div class="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                data-settings-action="archive"
+                                class="settings-link"
+                            >
+                                "Browse archive"
+                            </button>
+                            <button
+                                type="button"
+                                data-settings-action="sync"
+                                class="settings-link"
+                            >
+                                "Sync & plan"
+                            </button>
+                            <button
+                                type="button"
+                                data-settings-action="data"
+                                class="settings-link"
+                            >
+                                "Import / export"
+                            </button>
+                            <button
+                                type="button"
+                                data-settings-action="conflicts"
+                                class="settings-link"
+                            >
+                                "Conflict copies"
+                            </button>
+                            <a href="/account" class="settings-link">"Account"</a>
+                            <a href="/billing" class="settings-link">"Billing"</a>
+                        </div>
+                    </div>
+
+                    <p class="font-ui text-[10px] text-on-surface-variant/50">
+                        "Preferences save automatically on this device."
+                    </p>
+                </div>
+            </div>
+        </div>
+    })
+}
+
+#[component]
 pub async fn conflict_overlay() -> Result<impl View> {
     Ok(view! {
         <div
@@ -161,10 +340,10 @@ pub async fn conflict_overlay() -> Result<impl View> {
             role="dialog"
             aria-modal="true"
             aria-labelledby="conflict-title"
-            class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-20 backdrop-blur-sm sm:pt-24"
+            class="overlay-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-20 backdrop-blur-sm sm:pt-24"
         >
             <div
-                class="w-full max-w-4xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+                class="overlay-card w-full max-w-4xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
             >
                 <div
                     class="flex items-start justify-between gap-4 border-b border-outline-variant/40 px-5 py-4"
@@ -219,10 +398,10 @@ pub async fn archive_overlay() -> Result<impl View> {
             role="dialog"
             aria-modal="true"
             aria-labelledby="archive-title"
-            class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-20 backdrop-blur-sm sm:pt-24"
+            class="overlay-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-20 backdrop-blur-sm sm:pt-24"
         >
             <div
-                class="w-full max-w-3xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+                class="overlay-card w-full max-w-3xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
             >
                 <div
                     class="flex items-start justify-between gap-4 border-b border-outline-variant/40 px-5 py-4"
@@ -276,10 +455,10 @@ pub async fn data_overlay() -> Result<impl View> {
             role="dialog"
             aria-modal="true"
             aria-label="Import and export"
-            class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
+            class="overlay-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
         >
             <div
-                class="w-full max-w-md overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+                class="overlay-card w-full max-w-md overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
             >
                 <div
                     class="flex items-center justify-between border-b border-outline-variant/40 px-5 py-3"
@@ -363,10 +542,10 @@ pub async fn search_overlay() -> Result<impl View> {
             role="dialog"
             aria-modal="true"
             aria-label="Search entries"
-            class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
+            class="overlay-backdrop fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
         >
             <div
-                class="w-full max-w-xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+                class="overlay-card w-full max-w-xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
             >
                 <input
                     id="search-input"
@@ -419,9 +598,7 @@ pub async fn today_entry() -> Result<impl View> {
             <div
                 class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-5"
             >
-                <span
-                    class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
-                ></span>
+                <span class="absolute -left-2 top-7 h-px w-3 bg-outline-variant/60"></span>
                 <div
                     class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)] sm:p-6"
                 >
@@ -457,7 +634,7 @@ pub async fn today_entry() -> Result<impl View> {
 pub async fn sidebar() -> Result<impl View> {
     Ok(view! {
         <aside
-            class="fixed inset-y-0 left-0 z-40 hidden h-screen w-[230px] shrink-0 flex-col border-r border-outline-variant/40 bg-surface-container-low/70 lg:static lg:z-auto lg:flex"
+            class="app-sidebar fixed inset-y-0 left-0 z-40 hidden h-screen w-[230px] shrink-0 flex-col border-r border-outline-variant/40 bg-surface-container-low/70 lg:static lg:z-auto lg:flex"
         >
             <div class="min-h-0 flex-1 overflow-hidden px-3 py-4">
                 <div class="flex items-center gap-3 px-2">
@@ -509,11 +686,16 @@ pub async fn sidebar() -> Result<impl View> {
                             </svg>
                             <span>"Timeline"</span>
                         </span>
-                        <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+                        <span
+                            class="font-ui text-[8px] uppercase tracking-[0.14em] text-primary/70"
+                        >
+                            "Now"
+                        </span>
                     </a>
                     <button
+                        id="open-search-sidebar"
                         type="button"
-                        class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left font-ui text-ui-label text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                        class="sidebar-action flex w-full items-center justify-between rounded px-2 py-1.5 text-left font-ui text-ui-label text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
                     >
                         <span class="flex items-center gap-2">
                             <svg
@@ -574,8 +756,9 @@ pub async fn sidebar() -> Result<impl View> {
 
                 <div class="flex items-center justify-between px-1">
                     <button
+                        id="open-settings"
                         type="button"
-                        class="flex items-center gap-2 font-ui text-ui-label text-on-surface-variant hover:text-on-surface"
+                        class="sidebar-action flex items-center gap-2 font-ui text-ui-label text-on-surface-variant hover:text-on-surface"
                     >
                         <svg
                             aria-hidden="true"
@@ -665,14 +848,11 @@ pub async fn sidebar() -> Result<impl View> {
                     <span class="flex items-center justify-between gap-2">
                         <span
                             id="sync-label"
-                            class="truncate font-ui text-[9px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant/80"
+                            data-sync-state="off"
+                            class="truncate font-ui text-[9px] font-semibold uppercase tracking-[0.12em]"
                         >
                             "Local journal"
                         </span>
-                        <span
-                            id="sync-dot"
-                            class="h-1.5 w-1.5 shrink-0 rounded-full border border-outline-variant bg-transparent"
-                        ></span>
                     </span>
                     <span
                         id="sync-detail"
@@ -682,9 +862,13 @@ pub async fn sidebar() -> Result<impl View> {
                     </span>
                 </button>
 
-                <div class="flex items-center gap-1.5 px-1 text-on-surface-variant/60">
-                    <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
-                    <span id="storage-status" class="font-ui text-[10px]">
+                <div class="px-1 font-ui text-[10px] text-on-surface-variant/60">
+                    <span
+                        class="block text-[9px] uppercase tracking-[0.12em] text-primary/60"
+                    >
+                        "Device"
+                    </span>
+                    <span id="storage-status" class="mt-0.5 block leading-4">
                         "Stored on this device"
                     </span>
                 </div>
@@ -697,7 +881,7 @@ pub async fn sidebar() -> Result<impl View> {
 pub async fn topbar() -> Result<impl View> {
     Ok(view! {
         <header
-            class="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-outline-variant/40 px-6"
+            class="app-topbar flex h-16 shrink-0 items-center justify-between gap-4 border-b border-outline-variant/40 px-6"
         >
             <div class="flex items-center gap-2">
                 <button
@@ -709,9 +893,8 @@ pub async fn topbar() -> Result<impl View> {
                     "☰"
                 </button>
                 <div
-                    class="hidden shrink-0 items-center gap-2 font-ui text-ui-label text-on-surface-variant/70 sm:flex"
+                    class="hidden shrink-0 items-center gap-2 border-l border-primary/30 pl-2 font-ui text-[9px] uppercase tracking-[0.14em] text-primary/70 sm:flex"
                 >
-                    <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
                     "Local · saved"
                 </div>
             </div>

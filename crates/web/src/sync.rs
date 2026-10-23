@@ -1,7 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use dainiki_core::parse_date;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use topcoat::{
@@ -683,8 +682,8 @@ fn require_storage(cx: &Cx) -> Result<&SyncStorage> {
 }
 
 fn validate_entry_id(entry_id: &str) -> Result<()> {
-    if parse_date(entry_id).is_none() {
-        return Err(bad_request("entry id must be YYYY-MM-DD").into());
+    if entry_id.len() != 64 || !entry_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(bad_request("invalid sync entry id").into());
     }
 
     Ok(())

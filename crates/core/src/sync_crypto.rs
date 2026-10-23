@@ -7,6 +7,7 @@ use chacha20poly1305::{
     aead::{Aead, KeyInit, Payload},
 };
 use flate2::{Compression, read::ZlibDecoder, write::ZlibEncoder};
+use hmac::{Hmac, KeyInit as HmacKeyInit, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -48,6 +49,8 @@ pub struct SyncManifest {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ManifestEntry {
     pub date: String,
+    #[serde(default)]
+    pub sync_id: String,
     pub hash: String,
     pub size: u64,
     pub revision: i64,
@@ -207,15 +210,28 @@ pub fn decrypt_manifest(key: &[u8; KEY_LENGTH], ciphertext: &[u8]) -> Result<Syn
     serde_json::from_slice(&json).map_err(|error| SyncCryptoError(error.to_string()))
 }
 
+/// Deterministic opaque object id for a date. The server sees this id but
+/// cannot recover the date without the master key.
+pub fn sync_entry_id(key: &[u8; KEY_LENGTH], date: &str) -> String {
+    let mut mac = <Hmac<Sha256> as HmacKeyInit>::new_from_slice(key)
+        .expect("HMAC accepts keys of any length");
+    mac.update(b"dainiki-entry-id-v1:");
+    mac.update(date.as_bytes());
+    hex_encode(&mac.finalize().into_bytes())
+}
+
 pub fn content_hash(plaintext: &str) -> String {
     bytes_hash(plaintext.as_bytes())
 }
 
 pub fn bytes_hash(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    let mut output = String::with_capacity(digest.len() * 2);
+    hex_encode(&Sha256::digest(bytes))
+}
 
-    for byte in digest {
+fn hex_encode(bytes: &[u8]) -> String {
+    let mut output = String::with_capacity(bytes.len() * 2);
+
+    for byte in bytes {
         use std::fmt::Write as _;
         let _ = write!(&mut output, "{byte:02x}");
     }
@@ -347,6 +363,7 @@ mod tests {
             updated_at: 42,
             entries: vec![ManifestEntry {
                 date: "2026-10-23".to_string(),
+                sync_id: sync_entry_id(&keys.master_key, "2026-10-23"),
                 hash: content_hash("hello"),
                 size: 5,
                 revision: 3,
@@ -359,6 +376,19 @@ mod tests {
             decrypt_manifest(&keys.master_key, &encrypted).unwrap(),
             manifest
         );
+    }
+
+    #[test]
+    fn entry_ids_are_stable_opaque_and_date_specific() {
+        let keys = create_sync_keys("a long sync passphrase").unwrap();
+        let first = sync_entry_id(&keys.master_key, "2026-10-23");
+        let second = sync_entry_id(&keys.master_key, "2026-10-23");
+        let other = sync_entry_id(&keys.master_key, "2026-10-22");
+
+        assert_eq!(first, second);
+        assert_ne!(first, other);
+        assert_eq!(first.len(), 64);
+        assert!(!first.contains("2026"));
     }
 
     #[test]

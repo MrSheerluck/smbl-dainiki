@@ -15,8 +15,8 @@ use dainiki_core::{
     month_year, parse_date, parse_entry,
     sync_crypto::{
         ManifestEntry, SyncManifest, bytes_hash, content_hash, create_sync_keys, decrypt_entry,
-        decrypt_manifest, encrypt_entry, encrypt_manifest, unlock_with_passphrase,
-        unlock_with_recovery_key,
+        decrypt_manifest, encrypt_entry, encrypt_manifest, sync_entry_id,
+        unlock_with_passphrase, unlock_with_recovery_key,
     },
     weekday_name,
 };
@@ -1338,6 +1338,12 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
             entries: Vec::new(),
         },
     };
+
+    for entry in &mut manifest.entries {
+        if entry.sync_id.is_empty() {
+            entry.sync_id = sync_entry_id(&key, &entry.date);
+        }
+    }
     let mut manifest_entries: HashMap<String, ManifestEntry> = manifest
         .entries
         .drain(..)
@@ -1411,13 +1417,18 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
         }
 
         let base_revision = remote.as_ref().map(|entry| entry.revision).unwrap_or(0);
+        let sync_id = remote
+            .as_ref()
+            .map(|entry| entry.sync_id.clone())
+            .unwrap_or_else(|| sync_entry_id(&key, iso));
 
-        match sync::delete_entry(iso, base_revision).await {
+        match sync::delete_entry(&sync_id, base_revision).await {
             Ok(write) => {
                 manifest_entries.insert(
                     iso.clone(),
                     ManifestEntry {
                         date: iso.clone(),
+                        sync_id,
                         hash: String::new(),
                         size: 0,
                         revision: write.revision,
@@ -1428,13 +1439,14 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
                 deleted += 1;
             }
             Err(sync::SyncError::Conflict) => {
-                if sync::get_entry(iso)
+                if sync::get_entry(&sync_id)
                     .await
                     .map_err(|error| error.message())?
                     .is_some()
                 {
                     let mut preserved = HashMap::new();
-                    download_entry(&key, iso, &mut preserved, &mut manifest_entries).await?;
+                    download_entry(&key, iso, &sync_id, &mut preserved, &mut manifest_entries)
+                        .await?;
                     if let Some(text) = preserved.remove(iso) {
                         local.insert(iso.clone(), text);
                     }
@@ -1481,16 +1493,21 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
 
         match action {
             "upload" => {
-                let base_revision = remote_entry.map(|entry| entry.revision).unwrap_or(0);
+                let base_revision = remote_entry.as_ref().map(|entry| entry.revision).unwrap_or(0);
+                let sync_id = remote_entry
+                    .as_ref()
+                    .map(|entry| entry.sync_id.clone())
+                    .unwrap_or_else(|| sync_entry_id(&key, &iso));
                 let encrypted = encrypt_entry(&key, &iso, &text)
                     .map_err(|error| error.to_string())?;
 
-                match sync::put_entry(&iso, base_revision, encrypted, &local_hash).await {
+                match sync::put_entry(&sync_id, base_revision, encrypted, &local_hash).await {
                     Ok(write) => {
                         manifest_entries.insert(
                             iso.clone(),
                             ManifestEntry {
                                 date: iso.clone(),
+                                sync_id,
                                 hash: write.hash,
                                 size: write.size as u64,
                                 revision: write.revision,
@@ -1501,14 +1518,25 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
                     }
                     Err(sync::SyncError::Conflict) => {
                         conflicts += 1;
-                        handle_remote_conflict(&state, &key, &iso, &text, &mut manifest_entries)
-                            .await?;
+                        handle_remote_conflict(
+                            &state,
+                            &key,
+                            &iso,
+                            &sync_id,
+                            &text,
+                            &mut manifest_entries,
+                        )
+                        .await?;
                     }
                     Err(error) => return Err(error.message()),
                 }
             }
             "download" => {
-                download_entry(&key, &iso, &mut local, &mut manifest_entries).await?;
+                let sync_id = remote_entry
+                    .as_ref()
+                    .map(|entry| entry.sync_id.clone())
+                    .unwrap_or_else(|| sync_entry_id(&key, &iso));
+                download_entry(&key, &iso, &sync_id, &mut local, &mut manifest_entries).await?;
                 downloaded += 1;
             }
             "conflict" => {
@@ -1517,7 +1545,11 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
                     .map_err(js_message)?;
                 let _ = conflict;
                 conflicts += 1;
-                download_entry(&key, &iso, &mut local, &mut manifest_entries).await?;
+                let sync_id = remote_entry
+                    .as_ref()
+                    .map(|entry| entry.sync_id.clone())
+                    .unwrap_or_else(|| sync_entry_id(&key, &iso));
+                download_entry(&key, &iso, &sync_id, &mut local, &mut manifest_entries).await?;
                 downloaded += 1;
             }
             _ => {}
@@ -1535,7 +1567,11 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
     let limit = if download_all { usize::MAX } else { 30 };
 
     for iso in remote_only.into_iter().take(limit) {
-        download_entry(&key, &iso, &mut local, &mut manifest_entries).await?;
+        let sync_id = manifest_entries
+            .get(&iso)
+            .map(|entry| entry.sync_id.clone())
+            .unwrap_or_else(|| sync_entry_id(&key, &iso));
+        download_entry(&key, &iso, &sync_id, &mut local, &mut manifest_entries).await?;
         downloaded += 1;
     }
 
@@ -1565,8 +1601,13 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
                     return Err("The remote manifest disappeared during sync.".to_string());
                 };
                 base_revision = latest.revision;
-                let latest = decrypt_manifest(&key, &latest.bytes)
+                let mut latest = decrypt_manifest(&key, &latest.bytes)
                     .map_err(|error| error.to_string())?;
+                for entry in &mut latest.entries {
+                    if entry.sync_id.is_empty() {
+                        entry.sync_id = sync_entry_id(&key, &entry.date);
+                    }
+                }
                 updated = merge_manifests(&latest, &updated);
             }
             Err(error) => return Err(error.message()),
@@ -1641,10 +1682,11 @@ fn merge_manifests(latest: &SyncManifest, ours: &SyncManifest) -> SyncManifest {
 async fn download_entry(
     key: &[u8; 32],
     iso: &str,
+    sync_id: &str,
     local: &mut HashMap<String, String>,
     manifest_entries: &mut HashMap<String, ManifestEntry>,
 ) -> Result<(), String> {
-    let Some(remote) = sync::get_entry(iso).await.map_err(|error| error.message())? else {
+    let Some(remote) = sync::get_entry(sync_id).await.map_err(|error| error.message())? else {
         return Ok(());
     };
     let text = decrypt_entry(key, iso, &remote.bytes).map_err(|error| error.to_string())?;
@@ -1654,6 +1696,7 @@ async fn download_entry(
     if let Some(entry) = manifest_entries.get_mut(iso) {
         entry.revision = remote.revision;
         entry.hash = remote.hash;
+        entry.sync_id = sync_id.to_string();
         entry.deleted = false;
     }
 
@@ -1664,6 +1707,7 @@ async fn handle_remote_conflict(
     state: &SharedState,
     key: &[u8; 32],
     iso: &str,
+    sync_id: &str,
     local_text: &str,
     manifest_entries: &mut HashMap<String, ManifestEntry>,
 ) -> Result<(), String> {
@@ -1671,7 +1715,7 @@ async fn handle_remote_conflict(
         .await
         .map_err(js_message)?;
     let mut local = HashMap::new();
-    download_entry(key, iso, &mut local, manifest_entries).await?;
+    download_entry(key, iso, sync_id, &mut local, manifest_entries).await?;
     let _ = state;
     Ok(())
 }

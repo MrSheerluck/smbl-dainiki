@@ -520,6 +520,13 @@ class DainikiE2E(unittest.TestCase):
         self.assertTrue(self.page.locator("#open-conflicts").is_visible())
 
     def test_offline_shell(self):
+        manifest = self.page.evaluate(
+            "fetch('/manifest.webmanifest').then((response) => response.json())"
+        )
+        for icon in manifest["icons"]:
+            response = self.page.request.get(f"{BASE_URL}{icon['src']}")
+            self.assertEqual(response.status, 200, icon["src"])
+
         self.page.reload(wait_until="networkidle")
         self.page.wait_for_timeout(900)
         self.page.wait_for_function(

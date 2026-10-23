@@ -34,6 +34,9 @@ path_param!(base_revision: i64, error = bad_request("invalid base revision"));
 
 #[derive(Debug, Serialize)]
 pub struct SyncStatus {
+    pub user_id: i64,
+    pub email: String,
+    pub plan: Option<String>,
     pub active: bool,
     pub linked: bool,
     pub storage_ready: bool,
@@ -137,6 +140,9 @@ pub async fn sync_status(cx: &Cx) -> Result<Json<SyncStatus>> {
     .await?;
 
     Ok(Json(SyncStatus {
+        user_id: user.id,
+        email: user.email.clone(),
+        plan: user.plan.clone(),
         active,
         linked,
         storage_ready: storage.enabled(),

@@ -173,16 +173,38 @@ class DainikiE2E(unittest.TestCase):
 
         self.page.locator(f'a[data-iso="{yesterday}"]').click()
         self.page.wait_for_timeout(500)
-        self.assertEqual(self.page.locator("#timeline-entries textarea").count(), 1)
+        self.assertEqual(self.page.locator("#timeline-entries .inline-live").count(), 1)
+        self.assertEqual(self.page.locator("#timeline-entries .inline-live .line").count(), 1)
+        self.assertEqual(self.page.locator("#timeline-entries .inline-live .line.active").count(), 1)
 
-        self.page.locator("#timeline-entries textarea").fill("Yesterday edited. #past")
+        self.page.locator("#timeline-entries .inline-live .line").first.click()
+        self.page.keyboard.press("End")
+        self.page.keyboard.type(" edited.")
         self.page.wait_for_timeout(900)
         self.page.locator("#timeline-entries .inline-done").click()
         self.page.wait_for_timeout(800)
 
-        self.assertIn("Yesterday edited.", self.page.locator(f'a[data-iso="{yesterday}"]').inner_text())
+        self.assertIn("Yesterday text.", self.page.locator(f'a[data-iso="{yesterday}"]').inner_text())
+        self.assertIn("edited.", self.page.locator(f'a[data-iso="{yesterday}"]').inner_text())
         self.assertEqual(self.page.locator("#today-day").inner_text(), str(dt.date.today().day))
-        self.assertEqual(self.read_entry(yesterday), "Yesterday edited. #past")
+        self.assertEqual(self.read_entry(yesterday), "Yesterday text. #past edited.")
+
+    def test_inline_live_preview_renders_inactive_lines(self):
+        yesterday = iso_shift(self.today(), -1)
+        self.seed([{"iso": yesterday, "text": "First **bold** line\nSecond line"}])
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(900)
+
+        self.page.locator(f'a[data-iso="{yesterday}"]').click()
+        self.page.wait_for_timeout(500)
+        self.assertEqual(self.page.locator("#timeline-entries .inline-live .line").count(), 2)
+        self.assertEqual(self.page.locator("#timeline-entries .inline-live .md-strong").count(), 1)
+        self.assertEqual(self.page.locator("#timeline-entries .inline-live .line.active").count(), 1)
+        self.assertNotIn("**bold**", self.page.locator("#timeline-entries .inline-live").inner_text())
+
+        self.page.locator("#timeline-entries .inline-live .line").first.click()
+        self.page.wait_for_timeout(200)
+        self.assertIn("**bold**", self.page.locator("#timeline-entries .inline-live .line.active").inner_text())
 
     def test_search_opens_inline(self):
         today = self.today()
@@ -200,7 +222,7 @@ class DainikiE2E(unittest.TestCase):
 
         self.page.keyboard.press("Enter")
         self.page.wait_for_timeout(900)
-        self.assertEqual(self.page.locator("#timeline-entries textarea").count(), 1)
+        self.assertEqual(self.page.locator("#timeline-entries .inline-live").count(), 1)
         self.assertEqual(self.page.locator("#today-day").inner_text(), str(dt.date.today().day))
 
     def test_tags_filter_and_calendar(self):
@@ -228,7 +250,7 @@ class DainikiE2E(unittest.TestCase):
 
         self.page.locator(f'#calendar button[aria-label="{yesterday}"]').click()
         self.page.wait_for_timeout(700)
-        self.assertEqual(self.page.locator("#timeline-entries textarea").count(), 1)
+        self.assertEqual(self.page.locator("#timeline-entries .inline-live").count(), 1)
         self.assertEqual(self.page.locator("#today-day").inner_text(), str(dt.date.today().day))
 
     def test_theme_persists(self):

@@ -28,7 +28,7 @@ use wasm_bindgen::{JsCast, JsValue, prelude::*};
 use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::{
     Blob, ClipboardEvent, Document, Element, Event, File, HtmlAnchorElement, HtmlElement,
-    HtmlInputElement, HtmlTextAreaElement, KeyboardEvent, Node, Url,
+    HtmlInputElement, KeyboardEvent, Node, Url,
 };
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::SimpleFileOptions};
 
@@ -68,10 +68,14 @@ struct State {
     inline_base: String,
     inline_link: Option<Element>,
     inline_container: Option<Element>,
-    inline_textarea: Option<HtmlTextAreaElement>,
+    inline_editor: Option<HtmlElement>,
     inline_status: Option<Element>,
     inline_saving: bool,
     inline_save_timeout: Option<Timeout>,
+    inline_undo_stack: Vec<String>,
+    inline_redo_stack: Vec<String>,
+    inline_last_snapshot: String,
+    inline_history_timeout: Option<Timeout>,
     sidebar: Element,
     sidebar_backdrop: Element,
     welcome_overlay: Element,
@@ -85,6 +89,9 @@ struct State {
     history_timeout: Option<Timeout>,
     sync_overlay: Element,
     sync_content: Element,
+    sync_label: Element,
+    sync_detail: Element,
+    sync_dot: Element,
     sync_status: Option<sync::SyncStatus>,
     sync_signed_out: bool,
     sync_keys: Option<sync::SyncKeys>,
@@ -99,6 +106,12 @@ struct State {
 }
 
 type SharedState = Rc<RefCell<State>>;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EditorKind {
+    Main,
+    Inline,
+}
 
 fn spawn_result<F>(future: F)
 where
@@ -160,10 +173,14 @@ pub fn start() -> Result<(), JsValue> {
         inline_base: String::new(),
         inline_link: None,
         inline_container: None,
-        inline_textarea: None,
+        inline_editor: None,
         inline_status: None,
         inline_saving: false,
         inline_save_timeout: None,
+        inline_undo_stack: Vec::new(),
+        inline_redo_stack: Vec::new(),
+        inline_last_snapshot: String::new(),
+        inline_history_timeout: None,
         sidebar: element(&document, "aside")?,
         sidebar_backdrop: element(&document, "#sidebar-backdrop")?,
         welcome_overlay: element(&document, "#welcome-overlay")?,
@@ -177,6 +194,9 @@ pub fn start() -> Result<(), JsValue> {
         history_timeout: None,
         sync_overlay: element(&document, "#sync-overlay")?,
         sync_content: element(&document, "#sync-content")?,
+        sync_label: element(&document, "#sync-label")?,
+        sync_detail: element(&document, "#sync-detail")?,
+        sync_dot: element(&document, "#sync-dot")?,
         sync_status: None,
         sync_signed_out: false,
         sync_keys: None,
@@ -274,6 +294,7 @@ async fn init(state: SharedState) -> Result<(), JsValue> {
     load_entry(state.clone(), &iso).await?;
     refresh(state.clone()).await?;
     maybe_show_welcome(&state);
+    spawn_result(auto_start_sync(state));
     Ok(())
 }
 
@@ -336,6 +357,39 @@ fn local_storage() -> Option<web_sys::Storage> {
     web_sys::window()?.local_storage().ok().flatten()
 }
 
+fn editor_element(state: &State, kind: EditorKind) -> Option<HtmlElement> {
+    match kind {
+        EditorKind::Main => Some(state.editor.clone()),
+        EditorKind::Inline => state.inline_editor.clone(),
+    }
+}
+
+fn editor_kind_for_node(state: &State, node: &Node) -> Option<EditorKind> {
+    if state
+        .inline_editor
+        .as_ref()
+        .is_some_and(|editor| editor.contains(Some(node)))
+    {
+        return Some(EditorKind::Inline);
+    }
+
+    state
+        .editor
+        .contains(Some(node))
+        .then_some(EditorKind::Main)
+}
+
+fn editor_kind_for_selection(state: &State, document: &Document) -> Option<EditorKind> {
+    let node = document.get_selection().ok()??.anchor_node()?;
+    editor_kind_for_node(state, &node)
+}
+
+fn source_for_editor(state: &State, kind: EditorKind) -> String {
+    editor_element(state, kind)
+        .map(|editor| markdown::source_from_editor(&editor))
+        .unwrap_or_default()
+}
+
 fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> {
     let editor = state.borrow().editor.clone();
 
@@ -349,7 +403,7 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
             }
 
             schedule_save(input_state.clone());
-            schedule_history(input_state.clone());
+            schedule_history(input_state.clone(), EditorKind::Main);
         }),
     )?;
 
@@ -369,7 +423,7 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         Closure::<dyn FnMut(Event)>::new(move |_| {
             composition_end.borrow_mut().composing = false;
             schedule_save(composition_end.clone());
-            schedule_history(composition_end.clone());
+            schedule_history(composition_end.clone(), EditorKind::Main);
         }),
     )?;
 
@@ -379,7 +433,7 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         editor.as_ref(),
         "paste",
         Closure::<dyn FnMut(Event)>::new(move |event| {
-            handle_paste(paste_state.clone(), &paste_document, event);
+            handle_paste(paste_state.clone(), &paste_document, event, EditorKind::Main);
         }),
     )?;
 
@@ -855,10 +909,12 @@ fn handle_keydown(state: SharedState, document: &Document, event: Event) {
     if modifier && event.key().eq_ignore_ascii_case("z") {
         event.prevent_default();
 
+        let kind = editor_kind_for_selection(&state.borrow(), document)
+            .unwrap_or(EditorKind::Main);
         if event.shift_key() {
-            redo(state, document);
+            redo(state, document, kind);
         } else {
-            undo(state, document);
+            undo(state, document, kind);
         }
 
         return;
@@ -866,17 +922,31 @@ fn handle_keydown(state: SharedState, document: &Document, event: Event) {
 
     if modifier && event.key().eq_ignore_ascii_case("y") {
         event.prevent_default();
-        redo(state, document);
+        let kind = editor_kind_for_selection(&state.borrow(), document)
+            .unwrap_or(EditorKind::Main);
+        redo(state, document, kind);
+        return;
+    }
+
+    let Some(kind) = editor_kind_for_selection(&state.borrow(), document) else {
+        return;
+    };
+
+    if kind == EditorKind::Inline
+        && (event.key() == "Escape" || (modifier && event.key() == "Enter"))
+    {
+        event.prevent_default();
+        spawn_result(finish_inline_edit(state, true));
         return;
     }
 
     if event.key() == "Enter" {
         event.prevent_default();
-        split_line(state, document);
+        split_line(state, document, kind);
         return;
     }
 
-    if event.key() == "Backspace" && merge_line(state, document) {
+    if event.key() == "Backspace" && merge_line(state, document, kind) {
         event.prevent_default();
     }
 }
@@ -1054,6 +1124,15 @@ async fn load_sync_status(state: SharedState) -> Result<(), JsValue> {
                     state.borrow_mut().sync_keys = Some(keys);
                 }
             }
+
+            let user_id = state.borrow().sync_status.as_ref().map(|status| status.user_id);
+            if linked && state.borrow().sync_master_key.is_none() {
+                if let Some(key) = user_id.and_then(remembered_sync_key) {
+                    let mut state = state.borrow_mut();
+                    state.sync_master_key = Some(key);
+                    state.sync_base = load_sync_base();
+                }
+            }
         }
         Err(sync::SyncError::Unauthorized) => {
             let mut state = state.borrow_mut();
@@ -1067,7 +1146,45 @@ async fn load_sync_status(state: SharedState) -> Result<(), JsValue> {
         }
     }
 
-    render_sync_panel(state);
+    render_sync_panel(state.clone());
+    update_sync_affordance(state);
+    Ok(())
+}
+
+async fn auto_start_sync(state: SharedState) -> Result<(), JsValue> {
+    match sync::fetch_status().await {
+        Ok(status) => {
+            let user_id = status.user_id;
+            let should_sync = status.active && status.linked && status.storage_ready;
+            {
+                let mut state = state.borrow_mut();
+                state.sync_status = Some(status);
+                state.sync_signed_out = false;
+            }
+
+            if should_sync {
+                if let Some(key) = remembered_sync_key(user_id) {
+                    {
+                        let mut state = state.borrow_mut();
+                        state.sync_master_key = Some(key);
+                        state.sync_base = load_sync_base();
+                    }
+                    update_sync_affordance(state.clone());
+                    run_sync_mode(state.clone(), true).await?;
+                }
+            }
+        }
+        Err(sync::SyncError::Unauthorized) => {
+            let mut state = state.borrow_mut();
+            state.sync_status = None;
+            state.sync_signed_out = true;
+        }
+        Err(error) => {
+            state.borrow_mut().sync_message = Some(error.message());
+        }
+    }
+
+    update_sync_affordance(state);
     Ok(())
 }
 
@@ -1101,7 +1218,7 @@ fn handle_sync_action(state: SharedState, document: &Document, event: Event) {
             state.borrow_mut().sync_download_all = true;
             spawn_result(run_sync(state));
         }
-        "lock" => lock_sync(state),
+        "forget" => forget_sync_device(state),
         _ => {}
     }
 }
@@ -1167,12 +1284,14 @@ async fn setup_sync(
         }
     }
 
+    remember_sync_key(&state);
     set_sync_message(
         &state,
-        "Sync key created. Save the recovery key below, then run a sync.",
+        "Sync is on. Save the recovery key below; this device will stay connected automatically.",
     );
-    render_sync_panel(state);
-    Ok(())
+    render_sync_panel(state.clone());
+    update_sync_affordance(state.clone());
+    run_sync(state).await
 }
 
 async fn unlock_sync(state: SharedState, passphrase: String) -> Result<(), JsValue> {
@@ -1211,7 +1330,9 @@ async fn unlock_sync(state: SharedState, passphrase: String) -> Result<(), JsVal
         state.sync_download_all = false;
     }
 
+    remember_sync_key(&state);
     render_sync_panel(state.clone());
+    update_sync_affordance(state.clone());
     run_sync(state).await
 }
 
@@ -1251,25 +1372,40 @@ async fn unlock_recovery_sync(state: SharedState, recovery: String) -> Result<()
         state.sync_download_all = false;
     }
 
+    remember_sync_key(&state);
     render_sync_panel(state.clone());
+    update_sync_affordance(state.clone());
     run_sync(state).await
 }
 
-fn lock_sync(state: SharedState) {
-    let recovery = state.borrow().sync_recovery.is_some();
+fn forget_sync_device(state: SharedState) {
+    let confirmed = web_sys::window()
+        .and_then(|window| {
+            window
+                .confirm_with_message(
+                    "Forget the sync key on this device? Sync will ask for your passphrase next time. Your journal stays here.",
+                )
+                .ok()
+        })
+        .unwrap_or(false);
+
+    if !confirmed {
+        return;
+    }
+
+    clear_remembered_sync_key();
     {
         let mut state = state.borrow_mut();
         state.sync_master_key = None;
         state.sync_recovery = None;
         state.sync_missing = 0;
         state.sync_download_all = false;
-        state.sync_message = Some(if recovery {
-            "Sync locked. Make sure you saved the recovery key before closing.".to_string()
-        } else {
-            "Sync locked on this device.".to_string()
-        });
+        state.sync_message = Some(
+            "Sync key forgotten on this device. Enter your passphrase to reconnect.".to_string(),
+        );
     }
-    render_sync_panel(state);
+    render_sync_panel(state.clone());
+    update_sync_affordance(state);
 }
 
 async fn sync_keys(state: &SharedState) -> Result<sync::SyncKeys, String> {
@@ -1294,6 +1430,7 @@ async fn run_sync_mode(state: SharedState, reload_editor: bool) -> Result<(), Js
     state.borrow_mut().sync_busy = true;
     set_sync_message(&state, "Syncing encrypted entries…");
     render_sync_panel(state.clone());
+    update_sync_affordance(state.clone());
 
     let result = perform_sync(state.clone(), reload_editor).await;
 
@@ -1309,7 +1446,8 @@ async fn run_sync_mode(state: SharedState, reload_editor: bool) -> Result<(), Js
     if let Ok(status) = sync::fetch_status().await {
         state.borrow_mut().sync_status = Some(status);
     }
-    render_sync_panel(state);
+    render_sync_panel(state.clone());
+    update_sync_affordance(state);
     Ok(())
 }
 
@@ -1755,6 +1893,24 @@ fn sync_panel_html(state: &State) -> String {
             return html;
         };
 
+        let plan_label = match status.plan.as_deref() {
+            Some("yearly") => "Yearly plan",
+            Some("monthly") => "Monthly plan",
+            _ => "Sync account",
+        };
+        html.push_str(&format!(
+            r#"<p class="mb-3 truncate font-ui text-ui-label text-on-surface-variant/70">{}</p>"#,
+            escape_sync(&format!(
+                "{} · {}",
+                status.email,
+                if status.active {
+                    plan_label
+                } else {
+                    "No active plan"
+                }
+            ))
+        ));
+
         if state.sync_busy {
             html.push_str(r#"<p class="font-ui text-ui-body text-on-surface-variant">Working…</p>"#);
             return html;
@@ -1777,7 +1933,7 @@ fn sync_panel_html(state: &State) -> String {
 
         if !status.linked {
             html.push_str(
-                r#"<p class="font-ui text-ui-body text-on-surface-variant">Create a sync passphrase. It encrypts your journal on this device and is never sent to the server.</p>
+                r#"<p class="font-ui text-ui-body text-on-surface-variant">Your plan includes encrypted sync. Set a passphrase once; after that this device stays connected automatically. The passphrase is never sent to the server.</p>
 <div class="mt-4 space-y-3">
   <label class="block"><span class="font-ui text-ui-label text-on-surface-variant">Sync passphrase</span><input id="sync-passphrase" type="password" minlength="12" autocomplete="new-password" class="mt-1 w-full rounded border border-outline-variant/60 bg-surface px-3 py-2 font-ui text-ui-body text-on-surface outline-none focus:border-primary"></label>
   <label class="block"><span class="font-ui text-ui-label text-on-surface-variant">Confirm passphrase</span><input id="sync-confirm" type="password" minlength="12" autocomplete="new-password" class="mt-1 w-full rounded border border-outline-variant/60 bg-surface px-3 py-2 font-ui text-ui-body text-on-surface outline-none focus:border-primary"></label>
@@ -1789,7 +1945,7 @@ fn sync_panel_html(state: &State) -> String {
 
         if state.sync_master_key.is_none() {
             html.push_str(
-                r#"<p class="font-ui text-ui-body text-on-surface-variant">Enter your sync passphrase to unlock encrypted sync on this device.</p>
+                r#"<p class="font-ui text-ui-body text-on-surface-variant">Enter your sync passphrase once to connect this device. After that, paid sync stays on automatically.</p>
 <div class="mt-4 space-y-3">
   <label class="block"><span class="font-ui text-ui-label text-on-surface-variant">Sync passphrase</span><input id="sync-passphrase" type="password" autocomplete="current-password" class="mt-1 w-full rounded border border-outline-variant/60 bg-surface px-3 py-2 font-ui text-ui-body text-on-surface outline-none focus:border-primary"></label>
   <button type="button" data-sync-action="unlock" class="rounded bg-primary px-4 py-2 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">Unlock sync</button>
@@ -1834,8 +1990,9 @@ fn sync_panel_html(state: &State) -> String {
         html.push_str(
             r#"<div class="mt-5 flex flex-wrap gap-2">
 <button type="button" data-sync-action="sync-now" class="rounded bg-primary px-4 py-2 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">Sync now</button>
-<button type="button" data-sync-action="lock" class="rounded border border-outline-variant/60 px-4 py-2 font-ui text-ui-label text-on-surface hover:bg-surface-container">Lock</button>
-</div>"#,
+<button type="button" data-sync-action="forget" class="rounded border border-outline-variant/60 px-4 py-2 font-ui text-ui-label text-on-surface-variant hover:bg-surface-container hover:text-on-surface">Forget this device</button>
+</div>
+<p class="mt-3 font-ui text-[10px] text-on-surface-variant/60">Sync stays on automatically while this account is active. Forget the device to require your passphrase again.</p>"#,
         );
 
         html
@@ -1843,6 +2000,133 @@ fn sync_panel_html(state: &State) -> String {
 
 fn set_sync_message(state: &SharedState, message: &str) {
     state.borrow_mut().sync_message = Some(message.to_string());
+}
+
+const SYNC_DEVICE_KEY: &str = "dainiki-sync-device";
+
+fn remember_sync_key(state: &SharedState) {
+    let (Some(key), Some(user_id)) = (
+        state.borrow().sync_master_key,
+        state
+            .borrow()
+            .sync_status
+            .as_ref()
+            .map(|status| status.user_id),
+    ) else {
+        return;
+    };
+
+    if let Some(storage) = local_storage() {
+        storage
+            .set_item(SYNC_DEVICE_KEY, &format!("{user_id}:{}", key_hex(&key)))
+            .ok();
+    }
+}
+
+fn remembered_sync_key(user_id: i64) -> Option<[u8; 32]> {
+    let storage = local_storage()?;
+    let stored = storage.get_item(SYNC_DEVICE_KEY).ok().flatten()?;
+    let (stored_user, key) = stored.split_once(':')?;
+
+    if stored_user.parse::<i64>().ok() != Some(user_id) {
+        storage.remove_item(SYNC_DEVICE_KEY).ok();
+        return None;
+    }
+
+    key_from_hex(key)
+}
+
+fn clear_remembered_sync_key() {
+    if let Some(storage) = local_storage() {
+        storage.remove_item(SYNC_DEVICE_KEY).ok();
+    }
+}
+
+fn key_hex(key: &[u8; 32]) -> String {
+    let mut output = String::with_capacity(64);
+    for byte in key {
+        use std::fmt::Write as _;
+        let _ = write!(&mut output, "{byte:02x}");
+    }
+    output
+}
+
+fn key_from_hex(value: &str) -> Option<[u8; 32]> {
+    if value.len() != 64 {
+        return None;
+    }
+
+    let mut key = [0_u8; 32];
+    for (index, chunk) in value.as_bytes().chunks_exact(2).enumerate() {
+        let text = std::str::from_utf8(chunk).ok()?;
+        key[index] = u8::from_str_radix(text, 16).ok()?;
+    }
+    Some(key)
+}
+
+fn update_sync_affordance(state: SharedState) {
+    let (label, detail, dot) = {
+        let state = state.borrow();
+
+        if state.sync_signed_out {
+            ("Local journal", "Sign in to sync".to_string(), "off")
+        } else if let Some(status) = &state.sync_status {
+            if state.sync_busy {
+                ("Paid sync", "Syncing…".to_string(), "busy")
+            } else if !status.active {
+                (
+                    "Signed in",
+                    format!("No active plan · {}", status.email),
+                    "setup",
+                )
+            } else if !status.storage_ready {
+                ("Paid sync", "Sync unavailable".to_string(), "off")
+            } else if !status.linked {
+                (
+                    "Paid sync",
+                    format!("Finish setup · {}", status.email),
+                    "setup",
+                )
+            } else if state.sync_master_key.is_none() {
+                (
+                    "Paid sync",
+                    format!("Connect this device · {}", status.email),
+                    "setup",
+                )
+            } else if state.sync_missing > 0 {
+                (
+                    "Paid sync",
+                    format!("On · {} · {} older", status.email, state.sync_missing),
+                    "on",
+                )
+            } else {
+                (
+                    "Paid sync",
+                    format!("On · {}", status.email),
+                    "on",
+                )
+            }
+        } else {
+            ("Journal", "Checking sync…".to_string(), "off")
+        }
+    };
+
+    let dot_class = match dot {
+        "on" => "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full border border-primary bg-primary",
+        "busy" => {
+            "mt-1.5 h-1.5 w-1.5 shrink-0 animate-pulse rounded-full border border-primary bg-primary"
+        }
+        "setup" => {
+            "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full border border-secondary bg-secondary"
+        }
+        _ => {
+            "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full border border-outline-variant bg-transparent"
+        }
+    };
+
+    state.borrow().sync_label.set_text_content(Some(label));
+    state.borrow().sync_detail.set_text_content(Some(&detail));
+    state.borrow().sync_dot.set_class_name(dot_class);
 }
 
 fn input_value(document: &Document, selector: &str) -> String {
@@ -2175,93 +2459,171 @@ fn io_error(error: std::io::Error) -> JsValue {
     JsValue::from_str(&format!("io: {error}"))
 }
 
-fn record_history(state: &SharedState) {
-    let source = markdown::source_from_editor(&state.borrow().editor);
+fn record_history(state: &SharedState, kind: EditorKind) {
+    let source = source_for_editor(&state.borrow(), kind);
     let mut borrowed = state.borrow_mut();
 
-    if source == borrowed.last_snapshot {
-        return;
+    match kind {
+        EditorKind::Main => {
+            if source == borrowed.last_snapshot {
+                return;
+            }
+
+            let previous = borrowed.last_snapshot.clone();
+            borrowed.undo_stack.push(previous);
+            if borrowed.undo_stack.len() > 80 {
+                borrowed.undo_stack.remove(0);
+            }
+            borrowed.last_snapshot = source;
+            borrowed.redo_stack.clear();
+        }
+        EditorKind::Inline => {
+            if source == borrowed.inline_last_snapshot {
+                return;
+            }
+
+            let previous = borrowed.inline_last_snapshot.clone();
+            borrowed.inline_undo_stack.push(previous);
+            if borrowed.inline_undo_stack.len() > 80 {
+                borrowed.inline_undo_stack.remove(0);
+            }
+            borrowed.inline_last_snapshot = source;
+            borrowed.inline_redo_stack.clear();
+        }
     }
-
-    let snapshot = borrowed.last_snapshot.clone();
-    borrowed.undo_stack.push(snapshot);
-
-    if borrowed.undo_stack.len() > 80 {
-        borrowed.undo_stack.remove(0);
-    }
-
-    borrowed.last_snapshot = source;
-    borrowed.redo_stack.clear();
 }
 
-fn push_current_history(state: &SharedState) {
-    let current = markdown::source_from_editor(&state.borrow().editor);
+fn push_current_history(state: &SharedState, kind: EditorKind) {
+    let current = source_for_editor(&state.borrow(), kind);
     let mut borrowed = state.borrow_mut();
 
-    if current == borrowed.last_snapshot {
-        return;
+    match kind {
+        EditorKind::Main => {
+            if current == borrowed.last_snapshot {
+                return;
+            }
+
+            borrowed.undo_stack.push(current.clone());
+            if borrowed.undo_stack.len() > 80 {
+                borrowed.undo_stack.remove(0);
+            }
+            borrowed.last_snapshot = current;
+            borrowed.redo_stack.clear();
+        }
+        EditorKind::Inline => {
+            if current == borrowed.inline_last_snapshot {
+                return;
+            }
+
+            borrowed.inline_undo_stack.push(current.clone());
+            if borrowed.inline_undo_stack.len() > 80 {
+                borrowed.inline_undo_stack.remove(0);
+            }
+            borrowed.inline_last_snapshot = current;
+            borrowed.inline_redo_stack.clear();
+        }
     }
-
-    borrowed.undo_stack.push(current.clone());
-
-    if borrowed.undo_stack.len() > 80 {
-        borrowed.undo_stack.remove(0);
-    }
-
-    borrowed.last_snapshot = current;
-    borrowed.redo_stack.clear();
 }
 
-fn sync_snapshot(state: &SharedState) {
-    let current = markdown::source_from_editor(&state.borrow().editor);
-    state.borrow_mut().last_snapshot = current;
+fn sync_snapshot(state: &SharedState, kind: EditorKind) {
+    let current = source_for_editor(&state.borrow(), kind);
+    match kind {
+        EditorKind::Main => state.borrow_mut().last_snapshot = current,
+        EditorKind::Inline => state.borrow_mut().inline_last_snapshot = current,
+    }
 }
 
-fn schedule_history(state: SharedState) {
+fn schedule_history(state: SharedState, kind: EditorKind) {
     let next_state = state.clone();
     let mut state = state.borrow_mut();
 
-    state.history_timeout = None;
-    state.history_timeout = Some(Timeout::new(350, move || {
-        record_history(&next_state);
-    }));
-}
-
-fn undo(state: SharedState, document: &Document) {
-    let current = markdown::source_from_editor(&state.borrow().editor);
-    let mut borrowed = state.borrow_mut();
-    let Some(previous) = borrowed.undo_stack.pop() else {
-        return;
-    };
-
-    if current != previous {
-        borrowed.redo_stack.push(current);
+    match kind {
+        EditorKind::Main => {
+            state.history_timeout = None;
+            state.history_timeout = Some(Timeout::new(350, move || {
+                record_history(&next_state, EditorKind::Main);
+            }));
+        }
+        EditorKind::Inline => {
+            state.inline_history_timeout = None;
+            state.inline_history_timeout = Some(Timeout::new(350, move || {
+                record_history(&next_state, EditorKind::Inline);
+            }));
+        }
     }
-
-    borrowed.last_snapshot = previous.clone();
-    borrowed.history_timeout = None;
-    drop(borrowed);
-
-    restore_source(&state, document, &previous);
 }
 
-fn redo(state: SharedState, document: &Document) {
-    let current = markdown::source_from_editor(&state.borrow().editor);
+fn undo(state: SharedState, document: &Document, kind: EditorKind) {
+    let current = source_for_editor(&state.borrow(), kind);
     let mut borrowed = state.borrow_mut();
-    let Some(next) = borrowed.redo_stack.pop() else {
+
+    let previous = match kind {
+        EditorKind::Main => borrowed.undo_stack.pop(),
+        EditorKind::Inline => borrowed.inline_undo_stack.pop(),
+    };
+    let Some(previous) = previous else {
         return;
     };
 
-    borrowed.undo_stack.push(current);
-    borrowed.last_snapshot = next.clone();
-    borrowed.history_timeout = None;
+    match kind {
+        EditorKind::Main => {
+            if current != previous {
+                borrowed.redo_stack.push(current);
+            }
+            borrowed.last_snapshot = previous.clone();
+            borrowed.history_timeout = None;
+        }
+        EditorKind::Inline => {
+            if current != previous {
+                borrowed.inline_redo_stack.push(current);
+            }
+            borrowed.inline_last_snapshot = previous.clone();
+            borrowed.inline_history_timeout = None;
+        }
+    }
     drop(borrowed);
 
-    restore_source(&state, document, &next);
+    restore_source(&state, document, kind, &previous);
 }
 
-fn restore_source(state: &SharedState, document: &Document, source: &str) {
-    let editor = state.borrow().editor.clone();
+fn redo(state: SharedState, document: &Document, kind: EditorKind) {
+    let current = source_for_editor(&state.borrow(), kind);
+    let mut borrowed = state.borrow_mut();
+
+    let next = match kind {
+        EditorKind::Main => borrowed.redo_stack.pop(),
+        EditorKind::Inline => borrowed.inline_redo_stack.pop(),
+    };
+    let Some(next) = next else {
+        return;
+    };
+
+    match kind {
+        EditorKind::Main => {
+            borrowed.undo_stack.push(current);
+            borrowed.last_snapshot = next.clone();
+            borrowed.history_timeout = None;
+        }
+        EditorKind::Inline => {
+            borrowed.inline_undo_stack.push(current);
+            borrowed.inline_last_snapshot = next.clone();
+            borrowed.inline_history_timeout = None;
+        }
+    }
+    drop(borrowed);
+
+    restore_source(&state, document, kind, &next);
+}
+
+fn restore_source(
+    state: &SharedState,
+    document: &Document,
+    kind: EditorKind,
+    source: &str,
+) {
+    let Some(editor) = editor_element(&state.borrow(), kind) else {
+        return;
+    };
     markdown::render_document(&editor, source);
 
     if let Ok(Some(line)) = editor.query_selector(".line:last-child") {
@@ -2270,10 +2632,15 @@ fn restore_source(state: &SharedState, document: &Document, source: &str) {
     }
 
     editor.focus().ok();
-    schedule_save(state.clone());
+    schedule_save_kind(state.clone(), kind);
 }
 
-fn handle_paste(state: SharedState, document: &Document, event: Event) {
+fn handle_paste(
+    state: SharedState,
+    document: &Document,
+    event: Event,
+    kind: EditorKind,
+) {
     let Ok(event) = event.dyn_into::<ClipboardEvent>() else {
         return;
     };
@@ -2292,11 +2659,14 @@ fn handle_paste(state: SharedState, document: &Document, event: Event) {
 
     event.prevent_default();
 
-    let Some(line) = ensure_active_line(document) else {
+    let Some(editor) = editor_element(&state.borrow(), kind) else {
+        return;
+    };
+    let Some(line) = ensure_active_line(document, &editor) else {
         return;
     };
 
-    push_current_history(&state);
+    push_current_history(&state, kind);
 
     let source = line.text_content().unwrap_or_default();
     let offset = caret_offset(document, &line).unwrap_or_else(|| utf16_len(&source));
@@ -2308,8 +2678,8 @@ fn handle_paste(state: SharedState, document: &Document, event: Event) {
         let next = format!("{before}{}{after}", parts[0]);
         markdown::render_line_into(&line, &next, true);
         place_caret_at_offset(document, &line, utf16_len(before) + utf16_len(parts[0]));
-        sync_snapshot(&state);
-        schedule_save(state);
+        sync_snapshot(&state, kind);
+        schedule_save_kind(state, kind);
         return;
     }
 
@@ -2331,16 +2701,15 @@ fn handle_paste(state: SharedState, document: &Document, event: Event) {
         place_caret_at_offset(document, &last_line, utf16_len(parts[parts.len() - 1]));
     }
 
-    sync_snapshot(&state);
-    schedule_save(state);
+    sync_snapshot(&state, kind);
+    schedule_save_kind(state, kind);
 }
 
-fn ensure_active_line(document: &Document) -> Option<Element> {
+fn ensure_active_line(document: &Document, editor: &Element) -> Option<Element> {
     if let Some(line) = active_line(document) {
         return Some(line);
     }
 
-    let editor = document.query_selector("#entry-editor").ok().flatten()?;
     let first = editor.first_element_child()?;
     first.class_list().add_1("active").ok()?;
     place_caret(document, &first, true);
@@ -2421,7 +2790,13 @@ fn normalize_newlines(text: &str) -> String {
 }
 
 fn update_active_line(state: SharedState, document: &Document) {
-    let editor = state.borrow().editor.clone();
+    let kind = editor_kind_for_selection(&state.borrow(), document);
+    let Some(kind) = kind else {
+        return;
+    };
+    let Some(editor) = editor_element(&state.borrow(), kind) else {
+        return;
+    };
     let new_line = active_line(document);
     let old_line = editor.query_selector(".line.active").ok().flatten();
 
@@ -2439,12 +2814,12 @@ fn update_active_line(state: SharedState, document: &Document) {
     }
 }
 
-fn split_line(state: SharedState, document: &Document) {
+fn split_line(state: SharedState, document: &Document, kind: EditorKind) {
     let Some(line) = active_line(document) else {
         return;
     };
 
-    push_current_history(&state);
+    push_current_history(&state, kind);
 
     let source = line.text_content().unwrap_or_default();
     let offset = caret_offset(document, &line).unwrap_or_else(|| utf16_len(&source));
@@ -2471,11 +2846,11 @@ fn split_line(state: SharedState, document: &Document) {
     }
 
     place_caret(document, &new_line, true);
-    sync_snapshot(&state);
-    schedule_save(state);
+    sync_snapshot(&state, kind);
+    schedule_save_kind(state, kind);
 }
 
-fn merge_line(state: SharedState, document: &Document) -> bool {
+fn merge_line(state: SharedState, document: &Document, kind: EditorKind) -> bool {
     let Some(line) = active_line(document) else {
         return false;
     };
@@ -2488,7 +2863,7 @@ fn merge_line(state: SharedState, document: &Document) -> bool {
         return false;
     };
 
-    push_current_history(&state);
+    push_current_history(&state, kind);
 
     let mut source = previous.text_content().unwrap_or_default();
     source.push_str(&line.text_content().unwrap_or_default());
@@ -2496,8 +2871,8 @@ fn merge_line(state: SharedState, document: &Document) -> bool {
     markdown::render_line_into(&previous, &source, true);
     line.remove();
     place_caret(document, &previous, false);
-    sync_snapshot(&state);
-    schedule_save(state);
+    sync_snapshot(&state, kind);
+    schedule_save_kind(state, kind);
     true
 }
 
@@ -2969,7 +3344,7 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
         .owner_document()
         .ok_or_else(|| JsValue::from_str("no document"))?;
     let container = document.create_element("div")?;
-    container.set_inner_html(&render::inline_editor(&text));
+    container.set_inner_html(&render::inline_editor());
 
     let Some(parent) = link.parent_node() else {
         return Ok(());
@@ -2979,9 +3354,9 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
     parent.insert_before(container.as_ref(), reference.as_ref())?;
     link.set_attribute("hidden", "true")?;
 
-    let textarea: HtmlTextAreaElement = container
-        .query_selector("textarea")?
-        .ok_or_else(|| JsValue::from_str("missing inline textarea"))?
+    let editor: HtmlElement = container
+        .query_selector(".inline-live")?
+        .ok_or_else(|| JsValue::from_str("missing inline editor"))?
         .dyn_into()?;
     let status = container
         .query_selector(".inline-status")?
@@ -2990,12 +3365,82 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
         .query_selector(".inline-done")?
         .ok_or_else(|| JsValue::from_str("missing inline done"))?;
 
+    markdown::render_document(&editor, &text);
+
     let input_state = state.clone();
     listen(
-        textarea.as_ref(),
+        editor.as_ref(),
         "input",
         Closure::<dyn FnMut(Event)>::new(move |_| {
+            if input_state.borrow().composing {
+                return;
+            }
+
             schedule_inline_save(input_state.clone());
+            schedule_history(input_state.clone(), EditorKind::Inline);
+        }),
+    )?;
+
+    let composition_start = state.clone();
+    listen(
+        editor.as_ref(),
+        "compositionstart",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            composition_start.borrow_mut().composing = true;
+        }),
+    )?;
+
+    let composition_end = state.clone();
+    listen(
+        editor.as_ref(),
+        "compositionend",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            composition_end.borrow_mut().composing = false;
+            schedule_inline_save(composition_end.clone());
+            schedule_history(composition_end.clone(), EditorKind::Inline);
+        }),
+    )?;
+
+    let paste_state = state.clone();
+    let paste_document = document.clone();
+    listen(
+        editor.as_ref(),
+        "paste",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_paste(
+                paste_state.clone(),
+                &paste_document,
+                event,
+                EditorKind::Inline,
+            );
+        }),
+    )?;
+
+    let blur_state = state.clone();
+    listen(
+        editor.as_ref(),
+        "blur",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            let next_state = blur_state.clone();
+            spawn_result(async move { save_inline(next_state).await.map(|_| ()) });
+        }),
+    )?;
+
+    let key_state = state.clone();
+    let key_document = document.clone();
+    listen(
+        editor.as_ref(),
+        "keydown",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_keydown(key_state.clone(), &key_document, event);
+        }),
+    )?;
+
+    listen(
+        done.as_ref(),
+        "mousedown",
+        Closure::<dyn FnMut(Event)>::new(move |event: Event| {
+            event.prevent_default();
         }),
     )?;
 
@@ -3008,31 +3453,28 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
         }),
     )?;
 
-    let key_state = state.clone();
-    listen(
-        textarea.as_ref(),
-        "keydown",
-        Closure::<dyn FnMut(Event)>::new(move |event| {
-            handle_inline_keydown(key_state.clone(), event);
-        }),
-    )?;
-
-    let length = textarea.value().encode_utf16().count() as u32;
-    textarea.set_selection_range(length, length).ok();
+    if let Ok(Some(line)) = editor.query_selector(".line:last-child") {
+        line.class_list().add_1("active").ok();
+        place_caret(&document, &line, false);
+    }
 
     {
         let mut state = state.borrow_mut();
         state.inline_iso = Some(iso);
-        state.inline_base = text;
+        state.inline_base = text.clone();
         state.inline_link = Some(link);
         state.inline_container = Some(container);
-        state.inline_textarea = Some(textarea.clone());
+        state.inline_editor = Some(editor.clone());
         state.inline_status = Some(status);
         state.inline_saving = false;
         state.inline_save_timeout = None;
+        state.inline_undo_stack.clear();
+        state.inline_redo_stack.clear();
+        state.inline_last_snapshot = text;
+        state.inline_history_timeout = None;
     }
 
-    textarea.focus().ok();
+    editor.focus().ok();
     Ok(())
 }
 
@@ -3052,10 +3494,14 @@ async fn finish_inline_edit(state: SharedState, save: bool) -> Result<(), JsValu
 
         state.inline_iso = None;
         state.inline_base.clear();
-        state.inline_textarea = None;
+        state.inline_editor = None;
         state.inline_status = None;
         state.inline_saving = false;
         state.inline_save_timeout = None;
+        state.inline_undo_stack.clear();
+        state.inline_redo_stack.clear();
+        state.inline_last_snapshot.clear();
+        state.inline_history_timeout = None;
 
         (container, link)
     };
@@ -3073,20 +3519,20 @@ async fn finish_inline_edit(state: SharedState, save: bool) -> Result<(), JsValu
 }
 
 async fn save_inline(state: SharedState) -> Result<bool, JsValue> {
-    let (iso, text, base, textarea, status) = {
+    let (iso, text, base, editor, status) = {
         let state = state.borrow();
         let Some(iso) = state.inline_iso.clone() else {
             return Ok(true);
         };
-        let Some(textarea) = state.inline_textarea.clone() else {
+        let Some(editor) = state.inline_editor.clone() else {
             return Ok(true);
         };
 
         (
             iso,
-            textarea.value(),
+            markdown::source_from_editor(&editor),
             state.inline_base.clone(),
-            textarea,
+            editor,
             state.inline_status.clone(),
         )
     };
@@ -3111,8 +3557,14 @@ async fn save_inline(state: SharedState) -> Result<bool, JsValue> {
 
             match conflict {
                 Ok(name) => {
-                    textarea.set_value(&remote);
-                    state.borrow_mut().inline_base = remote;
+                    markdown::render_document(&editor, &remote);
+                    {
+                        let mut state = state.borrow_mut();
+                        state.inline_base = remote.clone();
+                        state.inline_last_snapshot = remote.clone();
+                        state.inline_undo_stack.clear();
+                        state.inline_redo_stack.clear();
+                    }
                     set_inline_status(status.as_ref(), &format!("Conflict copy saved as {name}"));
                     true
                 }
@@ -3124,7 +3576,7 @@ async fn save_inline(state: SharedState) -> Result<bool, JsValue> {
             }
         }
         Ok(Some(remote)) if remote == text => {
-            state.borrow_mut().inline_base = text;
+            state.borrow_mut().inline_base = text.clone();
             set_inline_status(status.as_ref(), "Saved locally");
             true
         }
@@ -3133,8 +3585,14 @@ async fn save_inline(state: SharedState) -> Result<bool, JsValue> {
 
             match conflict {
                 Ok(name) => {
-                    textarea.set_value("");
-                    state.borrow_mut().inline_base.clear();
+                    markdown::render_document(&editor, "");
+                    {
+                        let mut state = state.borrow_mut();
+                        state.inline_base.clear();
+                        state.inline_last_snapshot.clear();
+                        state.inline_undo_stack.clear();
+                        state.inline_redo_stack.clear();
+                    }
                     set_inline_status(
                         status.as_ref(),
                         &format!("Conflict copy saved as {name} — entry was deleted"),
@@ -3150,7 +3608,7 @@ async fn save_inline(state: SharedState) -> Result<bool, JsValue> {
         }
         Ok(Some(_)) => match opfs::write_entry(&iso, &text).await {
             Ok(()) => {
-                state.borrow_mut().inline_base = text;
+                state.borrow_mut().inline_base = text.clone();
                 set_inline_status(status.as_ref(), "Saved locally");
                 schedule_sync(state.clone());
                 true
@@ -3189,23 +3647,6 @@ fn schedule_inline_save(state: SharedState) {
 fn set_inline_status(status: Option<&Element>, text: &str) {
     if let Some(status) = status {
         status.set_text_content(Some(text));
-    }
-}
-
-fn handle_inline_keydown(state: SharedState, event: Event) {
-    let Ok(event) = event.dyn_into::<KeyboardEvent>() else {
-        return;
-    };
-
-    if event.is_composing() {
-        return;
-    }
-
-    let modifier = event.meta_key() || event.ctrl_key();
-
-    if event.key() == "Escape" || (modifier && event.key() == "Enter") {
-        event.prevent_default();
-        spawn_result(finish_inline_edit(state, true));
     }
 }
 
@@ -3314,6 +3755,13 @@ fn update_labels(state: &SharedState) {
     } else {
         state.today_button.remove_attribute("hidden").ok();
         state.next_day_button.remove_attribute("disabled").ok();
+    }
+}
+
+fn schedule_save_kind(state: SharedState, kind: EditorKind) {
+    match kind {
+        EditorKind::Main => schedule_save(state),
+        EditorKind::Inline => schedule_inline_save(state),
     }
 }
 

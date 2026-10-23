@@ -154,12 +154,23 @@ class DainikiSyncE2E(unittest.TestCase):
 
     def setup_sync(self, page):
         self.open_sync(page)
-        self.assertIn("Create a sync passphrase", page.locator("#sync-content").inner_text())
+        self.assertIn("Your plan includes encrypted sync", page.locator("#sync-content").inner_text())
         page.fill("#sync-passphrase", SYNC_PASSPHRASE)
         page.fill("#sync-confirm", SYNC_PASSPHRASE)
         page.click('[data-sync-action="setup"]')
-        page.wait_for_selector('[data-sync-action="sync-now"]', timeout=60000)
-        return self.click_sync_now(page)
+
+        deadline = time.time() + 90
+        clicked = False
+        while time.time() < deadline:
+            text = page.locator("#sync-content").inner_text()
+            if "Synced" in text:
+                return text
+            if not clicked and page.locator('[data-sync-action="sync-now"]').count():
+                page.click('[data-sync-action="sync-now"]')
+                clicked = True
+            page.wait_for_timeout(500)
+
+        return page.locator("#sync-content").inner_text()
 
     def unlock_sync(self, page):
         self.open_sync(page)
@@ -189,10 +200,12 @@ class DainikiSyncE2E(unittest.TestCase):
         self.signup(self.page, email)
         self.verify(self.page, email)
         self.open_journal(self.page)
+        self.assertEqual(self.page.locator("#sync-label").inner_text(), "Signed in")
+        self.assertIn("No active plan", self.page.locator("#sync-detail").inner_text())
         self.open_sync(self.page)
         self.assertIn("needs an active plan", self.page.locator("#sync-content").inner_text())
 
-    def test_setup_two_device_download_and_lock(self):
+    def test_setup_two_device_auto_sync(self):
         email = self.email()
         self.activate(self.page, email)
         self.open_journal(self.page)
@@ -208,22 +221,44 @@ class DainikiSyncE2E(unittest.TestCase):
         panel = self.setup_sync(self.page)
         self.assertIn("Synced 2 up", panel)
         self.assertIn("recovery key", self.page.locator("#sync-content").inner_text().lower())
+        self.assertEqual(self.page.locator("#sync-label").inner_text(), "Paid sync")
+        self.assertIn("On ·", self.page.locator("#sync-detail").inner_text())
 
         device_two = self.new_page()
         self.signin(device_two, email)
         self.open_journal(device_two)
+        self.assertIn("Connect this device", device_two.locator("#sync-detail").inner_text())
         panel = self.unlock_sync(device_two)
         self.assertIn("2 down", panel)
         self.assertIn("encrypted from device one", device_two.locator("#entry-editor").inner_text())
         self.assertTrue(any(name.endswith(".md") for name in self.local_files(device_two)))
 
-        device_two.click('[data-sync-action="lock"]')
-        self.assertIn(
-            "Enter your sync passphrase",
-            device_two.locator("#sync-content").inner_text(),
+        # The device remembers the key, so a reload syncs automatically.
+        device_two.evaluate(
+            """async () => {
+                const root = await navigator.storage.getDirectory();
+                try { await root.removeEntry("journal", {recursive: true}); } catch (error) {}
+            }"""
         )
-        panel = self.unlock_sync(device_two)
-        self.assertIn("Synced", panel)
+        device_two.reload(wait_until="networkidle")
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            if (
+                "On ·" in device_two.locator("#sync-detail").inner_text()
+                and "encrypted from device one"
+                in device_two.locator("#entry-editor").inner_text()
+            ):
+                break
+            device_two.wait_for_timeout(500)
+        self.assertIn("encrypted from device one", device_two.locator("#entry-editor").inner_text())
+        self.assertEqual(device_two.locator('[data-sync-action="lock"]').count(), 0)
+
+        self.open_sync(device_two)
+        device_two.on("dialog", lambda dialog: dialog.accept())
+        device_two.click('[data-sync-action="forget"]')
+        device_two.wait_for_timeout(500)
+        self.assertIn("Connect this device", device_two.locator("#sync-detail").inner_text())
+        self.assertIn("Enter your sync passphrase", device_two.locator("#sync-content").inner_text())
 
     def test_conflict_copy_and_remote_delete(self):
         email = self.email()

@@ -44,7 +44,7 @@ Journal (`test_journal.py`):
 
 - write, autosave, reload, OPFS persistence
 - inline editing of past entries while today stays at the top
-- local search opening an inline editor
+- local search opening an inline editor with live Markdown preview
 - tag counts/filtering and calendar date selection
 - light/dark theme persistence
 - external-change conflict copies
@@ -64,7 +64,7 @@ Accounts (`test_auth.py`):
 Encrypted sync (`test_sync.py`):
 
 - sync requires an active plan
-- passphrase setup, two-device download, lock/unlock
+- passphrase setup, two-device download, auto-connect after reload, Forget this device
 - conflict copies with the remote version canonical
 - encrypted deletion/tombstone propagation
 - recent-first download (30 entries) and explicit Download all

@@ -213,19 +213,17 @@ fn search_snippet(entry: &EntryRecord, query: &str) -> String {
     snippet
 }
 
-pub fn inline_editor(text: &str) -> String {
-    format!(
-        r#"<div class="rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm sm:p-6">
-  <textarea aria-label="Edit entry" class="min-h-[10rem] w-full resize-y border-0 bg-transparent font-journal text-journal text-on-surface outline-none" spellcheck="true">{text}</textarea>
+pub fn inline_editor() -> String {
+    r#"<div class="rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm sm:p-6">
+  <div class="inline-live live-editor min-h-[10rem] w-full font-journal text-journal text-on-surface outline-none" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Edit entry"></div>
   <div class="mt-3 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-2">
     <span aria-live="polite" class="inline-status font-ui text-[10px] text-on-surface-variant/60">Editing</span>
     <button type="button" class="inline-done rounded bg-primary px-3 py-1 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">
       Done
     </button>
   </div>
-</div>"#,
-        text = escape_html(text)
-    )
+</div>"#
+        .to_string()
 }
 
 pub fn editor_tags(tags: &[String]) -> String {

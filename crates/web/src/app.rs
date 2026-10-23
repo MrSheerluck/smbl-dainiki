@@ -518,29 +518,41 @@ pub async fn sidebar() -> Result<impl View> {
                 <button
                     id="open-sync"
                     type="button"
-                    class="flex w-full items-center justify-between px-1 text-left font-ui text-ui-label text-on-surface-variant hover:text-on-surface"
+                    class="flex w-full items-start gap-2 rounded px-1 py-1 text-left hover:bg-surface-container-high/60"
                 >
-                    <span class="flex items-center gap-2">
-                        <svg
-                            aria-hidden="true"
-                            class="h-4 w-4"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.7"
-                            stroke-linecap="round"
+                    <svg
+                        aria-hidden="true"
+                        class="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                    >
+                        <path
+                            d="M7 18a4 4 0 0 1-.6-7.96A6 6 0 0 1 18 8.5a4.5 4.5 0 0 1 1 8.9"
+                        ></path>
+                        <path d="M12 12v8"></path>
+                        <path d="m8.5 15.5 3.5-3.5 3.5 3.5"></path>
+                    </svg>
+                    <span class="min-w-0 flex-1">
+                        <span
+                            id="sync-label"
+                            class="block truncate font-ui text-ui-label text-on-surface"
                         >
-                            <path
-                                d="M7 18a4 4 0 0 1-.6-7.96A6 6 0 0 1 18 8.5a4.5 4.5 0 0 1 1 8.9"
-                            ></path>
-                            <path d="M12 12v8"></path>
-                            <path d="m8.5 15.5 3.5-3.5 3.5 3.5"></path>
-                        </svg>
-                        <span>"Enable sync"</span>
+                            "Local journal"
+                        </span>
+                        <span
+                            id="sync-detail"
+                            class="block truncate font-ui text-[10px] text-on-surface-variant/60"
+                        >
+                            "Sign in to sync"
+                        </span>
                     </span>
-                    <span class="font-ui text-[10px] text-on-surface-variant/50">
-                        "Paid"
-                    </span>
+                    <span
+                        id="sync-dot"
+                        class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full border border-outline-variant bg-transparent"
+                    ></span>
                 </button>
 
                 <div class="flex items-center justify-between px-1">

@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SyncStatus {
+    pub user_id: i64,
+    pub email: String,
+    pub plan: Option<String>,
     pub active: bool,
     pub linked: bool,
     pub storage_ready: bool,

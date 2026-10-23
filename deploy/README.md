@@ -73,6 +73,10 @@ Install `deploy/backup.sh` on the server and run it from deploy's crontab:
 17 3 * * * /opt/smbl/backup.sh >> /opt/smbl/backups/backup.log 2>&1
 ```
 
+To copy backups to R2 as well, install `awscli` and create
+`/opt/smbl/backup.env` from `backup.env.example`, mode `600`. The script writes
+both a local retained dump and `s3://<bucket>/backups/smbl-<timestamp>.dump`.
+
 Restore a dump into a new shared database or directly into `smbl`:
 
 ```sh

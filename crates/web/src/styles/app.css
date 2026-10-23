@@ -470,15 +470,15 @@ html[data-editor-size="large"] .live-editor .line {
   }
 
   .app-sidebar {
-    animation: app-sidebar-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: app-sidebar-in 560ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
   .app-topbar {
-    animation: app-topbar-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: app-topbar-in 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
   .app-main {
-    animation: app-main-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: app-main-in 620ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
   .entry-card {
@@ -630,12 +630,20 @@ html[data-editor-size="large"] .live-editor .line {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
   }
 }
 
 /* Zen mode: the journal page becomes the room. */
 .app-sidebar {
   overflow: hidden;
+  transition-delay: 220ms;
+  will-change: margin-left;
+}
+
+.app-topbar {
+  transition-delay: 0ms;
+  will-change: margin-top;
 }
 
 .app-sidebar,
@@ -645,12 +653,13 @@ html[data-editor-size="large"] .live-editor .line {
 #timeline-entries,
 .journal-page {
   transition:
-    width 520ms cubic-bezier(0.22, 1, 0.36, 1),
-    height 460ms cubic-bezier(0.22, 1, 0.36, 1),
-    max-width 520ms cubic-bezier(0.22, 1, 0.36, 1),
-    max-height 520ms cubic-bezier(0.22, 1, 0.36, 1),
-    margin 520ms cubic-bezier(0.22, 1, 0.36, 1),
-    padding 460ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 480ms cubic-bezier(0.4, 0, 0.2, 1),
+    height 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    max-width 480ms cubic-bezier(0.4, 0, 0.2, 1),
+    max-height 480ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    margin 480ms cubic-bezier(0.4, 0, 0.2, 1),
+    padding 440ms cubic-bezier(0.4, 0, 0.2, 1),
     opacity 300ms ease,
     border-color 300ms ease,
     background-color 300ms ease,
@@ -663,11 +672,11 @@ html[data-editor-size="large"] .live-editor .line {
 
 #timeline-entries {
   max-height: 20000px;
+  overflow: hidden;
   opacity: 1;
-  visibility: visible;
 }
 
-.zen-exit {
+button.zen-exit {
   opacity: 0;
   pointer-events: none;
   transform: translateY(-6px) scale(0.98);
@@ -676,32 +685,31 @@ html[data-editor-size="large"] .live-editor .line {
     transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
     border-color 180ms ease,
     color 180ms ease;
+  transition-delay: 0ms;
 }
 
-html[data-zen="true"] .zen-exit {
+html[data-zen="true"] button.zen-exit {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0) scale(1);
+  transition-delay: 560ms;
 }
 
 html[data-zen="true"] .app-sidebar {
-  width: 0;
-  opacity: 0;
-  visibility: hidden;
+  margin-left: -230px;
   pointer-events: none;
   border-right-width: 0;
+  transition-delay: 0ms;
 }
 
 html[data-zen="true"] .app-topbar {
-  height: 0;
-  opacity: 0;
+  margin-top: -4rem;
   pointer-events: none;
   border-bottom-width: 0;
+  transition-delay: 220ms;
 }
 
 html[data-zen="true"] .app-main {
-  padding-top: 4.5rem;
-  padding-bottom: 4.5rem;
   background-image:
     radial-gradient(
       circle at 50% 0%,
@@ -720,17 +728,25 @@ html[data-zen="true"] .journal-column {
 }
 
 html[data-zen="true"] .journal-page {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
+  border-color: color-mix(
+    in oklab,
+    var(--color-outline-variant) 70%,
+    transparent
+  );
+  background: color-mix(
+    in oklab,
+    var(--color-surface-container-lowest) 94%,
+    var(--color-surface-bright) 6%
+  );
+  box-shadow: 0 22px 55px -42px
+    color-mix(in oklab, var(--color-on-surface) 30%, transparent);
+  padding-left: 2rem;
+  padding-right: 2rem;
 }
 
 html[data-zen="true"] #timeline-entries {
   max-height: 0;
   opacity: 0;
-  visibility: hidden;
   margin-top: 0;
   pointer-events: none;
 }
@@ -748,10 +764,8 @@ html[data-zen="true"] #active-filter {
 @keyframes zen-page-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }

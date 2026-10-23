@@ -19,7 +19,7 @@ pub async fn timeline() -> Result<impl View> {
             <button
                 id="exit-zen"
                 type="button"
-                class="zen-exit fixed right-5 top-5 z-40 inline-flex items-center gap-2 rounded border border-outline-variant/50 bg-surface-container-lowest/90 px-3 py-2 font-ui text-ui-label text-on-surface-variant shadow-sm backdrop-blur-md hover:border-outline-variant hover:text-on-surface"
+                class="zen-exit fixed right-5 top-5 z-40 inline-flex items-center gap-2 rounded border border-outline-variant/50 bg-surface-container-lowest/90 px-3 py-2 font-ui text-ui-label text-on-surface-variant shadow-sm backdrop-blur-md hover:border-outline-variant"
                 aria-label="Exit zen mode"
                 title="Exit zen mode (Esc)"
             >

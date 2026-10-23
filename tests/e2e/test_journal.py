@@ -348,8 +348,16 @@ class DainikiE2E(unittest.TestCase):
         self.assertEqual(self.page.evaluate("document.documentElement.dataset.zen"), "true")
         self.assertTrue(self.page.locator("#exit-zen").is_visible())
         self.assertEqual(
-            self.page.locator(".app-sidebar").evaluate("(el) => getComputedStyle(el).visibility"),
-            "hidden",
+            self.page.locator(".app-sidebar").evaluate(
+                "(el) => getComputedStyle(el).marginLeft"
+            ),
+            "-230px",
+        )
+        self.assertNotEqual(
+            self.page.locator(".journal-page").evaluate(
+                "(el) => getComputedStyle(el).backgroundColor"
+            ),
+            "rgba(0, 0, 0, 0)",
         )
 
         self.page.keyboard.press(f"{MOD}+.")

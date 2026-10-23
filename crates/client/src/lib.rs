@@ -21,7 +21,7 @@ use dainiki_core::{
     weekday_name,
 };
 use gloo_timers::callback::Timeout;
-use js_sys::Uint8Array;
+use js_sys::{Array, Function, Reflect, Uint8Array};
 use render::EntryRecord;
 use time::Duration;
 use wasm_bindgen::{JsCast, JsValue, prelude::*};
@@ -254,15 +254,15 @@ fn apply_theme(document: &Document, theme: &str) -> Result<(), JsValue> {
         .ok_or_else(|| JsValue::from_str("no document element"))?;
     root.set_attribute("data-theme", theme)?;
 
-    if let Some(button) = document.query_selector("#theme-toggle")? {
-        let (icon, label) = if theme == "dark" {
-            ("☀", "Switch to light theme")
-        } else {
-            ("☾", "Switch to dark theme")
-        };
+    if let Some(meta) = document.query_selector("meta[name=\"theme-color\"]")? {
+        meta.set_attribute(
+            "content",
+            if theme == "dark" { "#151312" } else { "#fef8f6" },
+        )?;
+    }
 
-        button.set_text_content(Some(icon));
-        button.set_attribute("aria-label", label)?;
+    if let Some(button) = document.query_selector("#theme-toggle")? {
+        button.set_attribute("aria-pressed", if theme == "dark" { "true" } else { "false" })?;
     }
 
     Ok(())
@@ -277,16 +277,36 @@ fn toggle_theme(document: &Document) -> Result<(), JsValue> {
         .unwrap_or_else(|| "light".to_string());
     let next = if current == "dark" { "light" } else { "dark" };
 
-    apply_theme(document, next)?;
-
-    if let Some(storage) = web_sys::window()
-        .ok_or_else(|| JsValue::from_str("no window"))?
-        .local_storage()?
-    {
+    if let Some(storage) = local_storage() {
         storage.set_item("dainiki-theme", next)?;
     }
 
-    Ok(())
+    let reduce_motion = web_sys::window()
+        .and_then(|window| window.match_media("(prefers-reduced-motion: reduce)").ok().flatten())
+        .is_some_and(|query| query.matches());
+
+    if !reduce_motion {
+        if let Ok(start) = Reflect::get(
+            document.as_ref(),
+            &JsValue::from_str("startViewTransition"),
+        ) {
+            if start.is_function() {
+                let callback_document = document.clone();
+                let callback_theme = next.to_string();
+                let callback = Closure::once_into_js(move || {
+                    let _ = apply_theme(&callback_document, &callback_theme);
+                });
+
+                let start: &Function = start.unchecked_ref();
+                if Reflect::apply(start, document.as_ref(), &Array::of1(&callback)).is_ok()
+                {
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    apply_theme(document, next)
 }
 
 async fn init(state: SharedState) -> Result<(), JsValue> {
@@ -2144,15 +2164,15 @@ fn update_sync_affordance(state: SharedState) {
     };
 
     let dot_class = match dot {
-        "on" => "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full border border-primary bg-primary",
+        "on" => "h-1.5 w-1.5 shrink-0 rounded-full border border-primary bg-primary",
         "busy" => {
-            "mt-1.5 h-1.5 w-1.5 shrink-0 animate-pulse rounded-full border border-primary bg-primary"
+            "h-1.5 w-1.5 shrink-0 animate-pulse rounded-full border border-primary bg-primary"
         }
         "setup" => {
-            "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full border border-secondary bg-secondary"
+            "h-1.5 w-1.5 shrink-0 rounded-full border border-secondary bg-secondary"
         }
         _ => {
-            "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full border border-outline-variant bg-transparent"
+            "h-1.5 w-1.5 shrink-0 rounded-full border border-outline-variant bg-transparent"
         }
     };
 

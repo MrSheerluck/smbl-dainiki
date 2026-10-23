@@ -1,4 +1,4 @@
-const CACHE = "dainiki-shell-v2";
+const CACHE = "dainiki-shell-v3";
 const SHELL = [
   "/",
   "/loader.js",

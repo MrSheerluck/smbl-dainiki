@@ -14,6 +14,32 @@
   --color-secondary: #944924;
   --color-outline: #727973;
   --color-outline-variant: #c2c8c1;
+  --color-surface-container-highest: #e7e1df;
+  --color-surface-variant: #e7e1df;
+  --color-surface-dim: #ded9d7;
+  --color-surface-bright: #fef8f6;
+  --color-background: #fef8f6;
+  --color-on-background: #1d1b1a;
+  --color-primary-container: #4a6b56;
+  --color-on-primary-container: #c5ead0;
+  --color-primary-fixed: #c6ebd1;
+  --color-primary-fixed-dim: #abcfb6;
+  --color-on-primary-fixed: #002111;
+  --color-on-primary-fixed-variant: #2d4d3a;
+  --color-secondary-container: #fe9e72;
+  --color-on-secondary-container: #77330f;
+  --color-secondary-fixed: #ffdbcd;
+  --color-secondary-fixed-dim: #ffb595;
+  --color-on-secondary-fixed: #360f00;
+  --color-on-secondary-fixed-variant: #76330f;
+  --color-tertiary: #554a35;
+  --color-on-tertiary: #ffffff;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-inverse-surface: #32302f;
+  --color-inverse-on-surface: #f5efed;
+  --color-inverse-primary: #abcfb6;
+  --color-surface-tint: #456651;
 
   --font-display: "Newsreader", ui-serif, Georgia, "Times New Roman", serif;
   --font-journal: "Newsreader", ui-serif, Georgia, "Times New Roman", serif;
@@ -43,21 +69,62 @@
   --text-ui-label: 0.75rem;
   --text-ui-label--line-height: 1rem;
   --text-ui-label--letter-spacing: 0.02em;
+
+  --text-ui-caption: 0.6875rem;
+  --text-ui-caption--line-height: 0.875rem;
+  --text-ui-caption--letter-spacing: 0.04em;
+
+  --text-ui-header: 0.875rem;
+  --text-ui-header--line-height: 1.25rem;
+  --text-ui-header--letter-spacing: 0.01em;
+
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-full: 0.75rem;
 }
 
 [data-theme="dark"] {
-  --color-surface: #1a1716;
-  --color-surface-container-low: #211d1b;
-  --color-surface-container: #26211f;
-  --color-surface-container-high: #332c29;
-  --color-surface-container-lowest: #2a2522;
-  --color-on-surface: #f7f0ec;
-  --color-on-surface-variant: #ddd5cf;
-  --color-primary: #b8dcc5;
-  --color-on-primary: #10281b;
-  --color-secondary: #ffc4a8;
-  --color-outline: #aab0a9;
-  --color-outline-variant: #5b625b;
+  --color-surface: #151312;
+  --color-surface-container: #1e1b19;
+  --color-surface-container-low: #191614;
+  --color-surface-container-lowest: #201c1a;
+  --color-surface-container-high: #2a2522;
+  --color-surface-container-highest: #332d29;
+  --color-surface-variant: #332d29;
+  --color-surface-dim: #151312;
+  --color-surface-bright: #2a2522;
+  --color-background: #151312;
+  --color-on-surface: #f2eae6;
+  --color-on-surface-variant: #c9c1ba;
+  --color-on-background: #f2eae6;
+  --color-primary: #a8cdb6;
+  --color-on-primary: #173123;
+  --color-primary-container: #3c5a47;
+  --color-on-primary-container: #d6f3df;
+  --color-primary-fixed: #294936;
+  --color-primary-fixed-dim: #4f725d;
+  --color-on-primary-fixed: #d6f3df;
+  --color-on-primary-fixed-variant: #c5ead0;
+  --color-secondary: #ffb595;
+  --color-on-secondary: #4a1f0d;
+  --color-secondary-container: #6e3218;
+  --color-on-secondary-container: #ffdbcd;
+  --color-secondary-fixed: #76330f;
+  --color-secondary-fixed-dim: #944924;
+  --color-on-secondary-fixed: #ffdbcd;
+  --color-on-secondary-fixed-variant: #ffb595;
+  --color-outline: #8f958e;
+  --color-outline-variant: #454b45;
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+  --color-inverse-surface: #f2eae6;
+  --color-inverse-on-surface: #32302f;
+  --color-inverse-primary: #456651;
+  --color-surface-tint: #456651;
 }
 
 /* Auth and recovery pages have no client theme script. Follow the system
@@ -66,18 +133,18 @@
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) {
     color-scheme: dark;
-    --color-surface: #1a1716;
-    --color-surface-container-low: #211d1b;
-    --color-surface-container: #26211f;
-    --color-surface-container-high: #332c29;
-    --color-surface-container-lowest: #2a2522;
-    --color-on-surface: #f7f0ec;
-    --color-on-surface-variant: #ddd5cf;
-    --color-primary: #b8dcc5;
-    --color-on-primary: #10281b;
-    --color-secondary: #ffc4a8;
-    --color-outline: #aab0a9;
-    --color-outline-variant: #5b625b;
+    --color-surface: #151312;
+    --color-surface-container-low: #191614;
+    --color-surface-container: #1e1b19;
+    --color-surface-container-high: #2a2522;
+    --color-surface-container-lowest: #201c1a;
+    --color-on-surface: #f2eae6;
+    --color-on-surface-variant: #c9c1ba;
+    --color-primary: #a8cdb6;
+    --color-on-primary: #173123;
+    --color-secondary: #ffb595;
+    --color-outline: #8f958e;
+    --color-outline-variant: #454b45;
   }
 }
 
@@ -98,6 +165,107 @@
       background-color 200ms ease,
       color 200ms ease;
   }
+
+  ::selection {
+    background: var(--color-primary-fixed);
+    color: var(--color-on-primary-fixed);
+  }
+}
+
+@layer utilities {
+  .paper-grain {
+    background-image:
+      radial-gradient(
+        circle at 12% 18%,
+        color-mix(in oklab, var(--color-secondary) 6%, transparent) 0,
+        transparent 28%
+      ),
+      radial-gradient(
+        circle at 88% 72%,
+        color-mix(in oklab, var(--color-primary) 6%, transparent) 0,
+        transparent 32%
+      );
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+}
+
+.theme-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  transition:
+    opacity 220ms ease,
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.theme-icon-moon {
+  opacity: 0;
+  transform: rotate(-70deg) scale(0.6);
+}
+
+html[data-theme="dark"] .theme-icon-sun {
+  opacity: 0;
+  transform: rotate(70deg) scale(0.6);
+}
+
+html[data-theme="dark"] .theme-icon-moon {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-group(root) {
+    animation: none;
+  }
+
+  ::view-transition-old(root) {
+    z-index: 1;
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  ::view-transition-new(root) {
+    z-index: 2;
+    -webkit-mask-image: radial-gradient(
+      circle at 100% 0%,
+      #000 0%,
+      #000 28%,
+      transparent 48%
+    );
+    mask-image: radial-gradient(
+      circle at 100% 0%,
+      #000 0%,
+      #000 28%,
+      transparent 48%
+    );
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: 100% 0%;
+    mask-position: 100% 0%;
+    -webkit-mask-size: 0% 0%;
+    mask-size: 0% 0%;
+    animation: theme-ink-bloom 900ms linear both;
+    will-change: mask-size;
+    mix-blend-mode: normal;
+  }
+}
+
+@keyframes theme-ink-bloom {
+  from {
+    -webkit-mask-size: 0% 0%;
+    mask-size: 0% 0%;
+  }
+  to {
+    -webkit-mask-size: 340% 340%;
+    mask-size: 340% 340%;
+  }
 }
 
 
@@ -114,6 +282,11 @@
 .live-editor .line {
   min-height: 1.625rem;
   outline: none;
+}
+
+.live-editor .line.line-empty:not(.active) {
+  min-height: 0.5rem;
+  line-height: 0.5rem;
 }
 
 .live-editor .marker {
@@ -141,15 +314,19 @@
 }
 
 .live-editor .md-h1 {
-  font-size: 2rem;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  letter-spacing: -0.01em;
 }
 
 .live-editor .md-h2 {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
+  line-height: 1.85rem;
 }
 
 .live-editor .md-h3 {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
+  line-height: 1.7rem;
 }
 
 .live-editor .md-h4,
@@ -185,14 +362,19 @@
 }
 
 .live-editor .md-tag {
-  color: var(--color-secondary);
+  color: color-mix(in oklab, var(--color-secondary) 78%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.86em;
 }
 
 .live-editor .md-quote {
   border-left: 2px solid
-    color-mix(in oklab, var(--color-secondary) 45%, transparent);
+    color-mix(in oklab, var(--color-secondary) 40%, transparent);
   padding-left: 1rem;
   color: var(--color-on-surface-variant);
+  font-size: 1.25rem;
+  line-height: 2rem;
+  font-style: italic;
 }
 
 .live-editor .md-hr {

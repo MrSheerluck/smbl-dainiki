@@ -10,7 +10,10 @@ pub fn render_document_html(markdown: &str) -> String {
 
     for line in markdown.split('\n') {
         let (class, inner) = render_line(line);
-        html.push_str(&format!(r#"<div class="line {class}">{inner}</div>"#));
+        let empty = if line.is_empty() { " line-empty" } else { "" };
+        html.push_str(&format!(
+            r#"<div class="line {class}{empty}">{inner}</div>"#
+        ));
     }
 
     html
@@ -27,6 +30,10 @@ pub fn render_line_into(line: &Element, source: &str, active: bool) {
 
     if active {
         classes.push_str(" active");
+    }
+
+    if source.is_empty() {
+        classes.push_str(" line-empty");
     }
 
     line.set_class_name(&classes);

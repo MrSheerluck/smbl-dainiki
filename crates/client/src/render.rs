@@ -43,22 +43,22 @@ pub fn timeline(
         for tag in &entry.meta.tags {
             let _ = write!(
                 tags,
-                r#"<span class="font-mono text-ui-label text-secondary/70">#{}</span>"#,
+                r#"<span class="font-mono text-ui-caption text-secondary/70">#{}</span>"#,
                 escape_html(tag)
             );
         }
 
         let _ = write!(
             html,
-            r##"<article class="flex gap-3 sm:gap-5" data-entry-iso="{iso}">
-  <div class="w-14 shrink-0 pt-1 text-right">
+            r##"<article class="flex gap-3 sm:gap-4" data-entry-iso="{iso}">
+  <div class="w-11 shrink-0 pt-1 text-right sm:w-14">
     <span class="block font-display text-[1.9rem] leading-none text-on-surface/70 sm:text-[2.2rem]">{day}</span>
     <span class="mt-1 block whitespace-nowrap font-ui text-[8px] uppercase tracking-wide text-on-surface-variant/70 sm:text-[9px]">{weekday}</span>
     <span class="mt-0.5 block font-ui text-[8px] text-on-surface-variant/50 sm:text-[9px]">{month}</span>
   </div>
-  <div class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6">
+  <div class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-3 sm:pl-4">
     <span class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"></span>
-    <div data-entry-card="true" data-iso="{iso}" role="link" tabindex="0" aria-label="Open the entry for {weekday}, {month} {day}" class="block cursor-text rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm transition-colors hover:border-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-6">
+    <div data-entry-card="true" data-iso="{iso}" role="link" tabindex="0" aria-label="Open the entry for {weekday}, {month} {day}" class="block cursor-text rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-4 shadow-[0_1px_3px_rgba(44,42,41,0.04)] transition-colors hover:border-outline-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-5">
       {body}
       <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3">{tags}</div>
@@ -217,7 +217,7 @@ fn search_snippet(entry: &EntryRecord, query: &str) -> String {
 }
 
 pub fn inline_editor() -> String {
-    r#"<div class="rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm sm:p-6">
+    r#"<div class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-4 shadow-[0_1px_3px_rgba(44,42,41,0.04)] sm:p-5">
   <div class="inline-live live-editor min-h-[10rem] w-full font-journal text-journal text-on-surface outline-none" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Edit entry"></div>
   <div class="mt-3 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-2">
     <span aria-live="polite" class="inline-status font-ui text-[10px] text-on-surface-variant/60">Editing</span>
@@ -231,7 +231,7 @@ pub fn editor_tags(tags: &[String]) -> String {
     tags.iter()
         .map(|tag| {
             format!(
-                r#"<span class="font-mono text-ui-label text-secondary/70">#{}</span>"#,
+                r#"<span class="font-mono text-ui-caption text-secondary/70">#{}</span>"#,
                 escape_html(tag)
             )
         })

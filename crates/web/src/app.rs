@@ -19,7 +19,7 @@ pub async fn timeline() -> Result<impl View> {
                 <main
                     class="flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:min-h-0 lg:overflow-y-auto lg:px-10"
                 >
-                    <div class="mx-auto space-y-8">
+                    <div class="mx-auto max-w-[44rem] space-y-7">
                         today_entry()
                         <div
                             id="active-filter"
@@ -277,8 +277,8 @@ pub async fn search_overlay() -> Result<impl View> {
 #[component]
 pub async fn today_entry() -> Result<impl View> {
     Ok(view! {
-        <article class="flex gap-3 sm:gap-5">
-            <div class="w-14 shrink-0 pt-1 text-right">
+        <article class="flex gap-3 sm:gap-4">
+            <div class="w-11 shrink-0 pt-1 text-right sm:w-14">
                 <span
                     id="today-day"
                     class="block font-display text-[1.9rem] leading-none text-on-surface/70 sm:text-[2.2rem]"
@@ -300,13 +300,13 @@ pub async fn today_entry() -> Result<impl View> {
             </div>
 
             <div
-                class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6"
+                class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-3 sm:pl-4"
             >
                 <span
                     class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
                 ></span>
                 <div
-                    class="rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm sm:p-6"
+                    class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-4 shadow-[0_1px_3px_rgba(44,42,41,0.04)] sm:p-5"
                 >
                     <div class="mb-4 flex items-center justify-end gap-2">
                         <button
@@ -337,7 +337,7 @@ pub async fn today_entry() -> Result<impl View> {
 
                     <div
                         id="entry-editor"
-                        class="live-editor min-h-[22rem] w-full font-journal text-journal text-on-surface"
+                        class="live-editor min-h-[11rem] w-full font-journal text-journal text-on-surface"
                         contenteditable="true"
                         spellcheck="true"
                         role="textbox"
@@ -371,11 +371,11 @@ pub async fn sidebar() -> Result<impl View> {
         >
             <div class="min-h-0 flex-1 overflow-hidden px-3 py-4">
                 <div class="flex items-center gap-3 px-2">
-                    <div
-                        class="flex h-9 w-9 items-center justify-center rounded-sm bg-primary font-display text-lg text-on-primary"
+                    <img
+                        alt="Dainiki logo"
+                        class="h-9 w-9 rounded object-contain"
+                        src="/icon-192.png"
                     >
-                        "D"
-                    </div>
                     <div>
                         <p
                             class="font-ui text-sm font-semibold leading-none tracking-tight text-on-surface"
@@ -385,7 +385,7 @@ pub async fn sidebar() -> Result<impl View> {
                         <p
                             class="mt-1 font-ui text-[9px] uppercase tracking-[0.14em] text-on-surface-variant"
                         >
-                            "A quiet journal"
+                            "by SMBL"
                         </p>
                     </div>
                     <button
@@ -515,46 +515,6 @@ pub async fn sidebar() -> Result<impl View> {
                     </span>
                 </div>
 
-                <button
-                    id="open-sync"
-                    type="button"
-                    class="flex w-full items-start gap-2 rounded px-1 py-1 text-left hover:bg-surface-container-high/60"
-                >
-                    <svg
-                        aria-hidden="true"
-                        class="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="1.7"
-                        stroke-linecap="round"
-                    >
-                        <path
-                            d="M7 18a4 4 0 0 1-.6-7.96A6 6 0 0 1 18 8.5a4.5 4.5 0 0 1 1 8.9"
-                        ></path>
-                        <path d="M12 12v8"></path>
-                        <path d="m8.5 15.5 3.5-3.5 3.5 3.5"></path>
-                    </svg>
-                    <span class="min-w-0 flex-1">
-                        <span
-                            id="sync-label"
-                            class="block truncate font-ui text-ui-label text-on-surface"
-                        >
-                            "Local journal"
-                        </span>
-                        <span
-                            id="sync-detail"
-                            class="block truncate font-ui text-[10px] text-on-surface-variant/60"
-                        >
-                            "Sign in to sync"
-                        </span>
-                    </span>
-                    <span
-                        id="sync-dot"
-                        class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full border border-outline-variant bg-transparent"
-                    ></span>
-                </button>
-
                 <div class="flex items-center justify-between px-1">
                     <button
                         id="open-data"
@@ -580,6 +540,31 @@ pub async fn sidebar() -> Result<impl View> {
                         "Import / export"
                     </span>
                 </div>
+
+                <button
+                    id="open-sync"
+                    type="button"
+                    class="w-full rounded-xl border border-surface-container-high/60 bg-surface-container-lowest/80 px-2.5 py-2 text-left shadow-[0_1px_2px_rgba(44,42,41,0.02)] transition-colors hover:border-outline-variant"
+                >
+                    <span class="flex items-center justify-between gap-2">
+                        <span
+                            id="sync-label"
+                            class="truncate font-ui text-[9px] font-semibold uppercase tracking-[0.12em] text-on-surface-variant/80"
+                        >
+                            "Local journal"
+                        </span>
+                        <span
+                            id="sync-dot"
+                            class="h-1.5 w-1.5 shrink-0 rounded-full border border-outline-variant bg-transparent"
+                        ></span>
+                    </span>
+                    <span
+                        id="sync-detail"
+                        class="mt-1 block truncate font-ui text-[10px] leading-4 text-on-surface-variant/70"
+                    >
+                        "Sign in to sync"
+                    </span>
+                </button>
 
                 <div class="flex items-center gap-1.5 px-1 text-on-surface-variant/60">
                     <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
@@ -619,7 +604,7 @@ pub async fn topbar() -> Result<impl View> {
                 <button
                     id="open-search"
                     type="button"
-                    class="flex w-full max-w-sm items-center gap-3 rounded-full border border-outline-variant/50 bg-surface-container-lowest px-4 py-2 text-left font-ui text-ui-body text-on-surface-variant hover:border-outline"
+                    class="flex w-full max-w-sm items-center gap-3 rounded-full border border-surface-container bg-surface-container-low px-4 py-2 text-left font-ui text-ui-body text-on-surface-variant hover:border-outline-variant"
                 >
                     <span>"Search entries…"</span>
                     <span
@@ -631,10 +616,43 @@ pub async fn topbar() -> Result<impl View> {
                 <button
                     id="theme-toggle"
                     type="button"
-                    aria-label="Switch to dark theme"
-                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-outline-variant/50 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                    aria-label="Toggle light and dark theme"
+                    aria-pressed="false"
+                    title="Toggle theme"
+                    class="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-outline-variant/60 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
                 >
-                    "☾"
+                    <svg
+                        aria-hidden="true"
+                        class="theme-icon theme-icon-sun h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="M12 3v2"></path>
+                        <path d="M12 19v2"></path>
+                        <path d="m5.6 5.6 1.4 1.4"></path>
+                        <path d="m17 17 1.4 1.4"></path>
+                        <path d="M3 12h2"></path>
+                        <path d="M19 12h2"></path>
+                        <path d="m5.6 18.4 1.4-1.4"></path>
+                        <path d="m17 7 1.4-1.4"></path>
+                        <circle cx="12" cy="12" r="4"></circle>
+                    </svg>
+                    <svg
+                        aria-hidden="true"
+                        class="theme-icon theme-icon-moon h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"></path>
+                    </svg>
                 </button>
             </div>
         </header>

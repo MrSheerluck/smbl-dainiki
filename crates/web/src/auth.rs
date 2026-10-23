@@ -895,27 +895,34 @@ pub async fn delete_account(
             "active" | "past_due" | "on_hold" | "paused"
         );
 
-        if needs_cancellation && dodo::mode() == BillingMode::Dodo {
-            let Some(config) = dodo::config() else {
-                return account_view(
-                    cx,
-                    user,
-                    None,
-                    Some("Could not cancel your subscription. Manage billing first.".to_string()),
-                );
-            };
+        if needs_cancellation {
+            if dodo::mode() == BillingMode::Mock {
+                // Mock subscriptions are local-only.
+            } else {
+                let Some(config) = dodo::config() else {
+                    return account_view(
+                        cx,
+                        user,
+                        None,
+                        Some(
+                            "Billing is not configured. Cancel your subscription before deleting the account."
+                                .to_string(),
+                        ),
+                    );
+                };
 
-            if let Err(error) = dodo::cancel_subscription(&config, &subscription_id).await {
-                eprintln!("[auth] subscription cancellation failed: {error}");
-                return account_view(
-                    cx,
-                    user,
-                    None,
-                    Some(
-                        "Could not cancel your subscription. Open billing and cancel it first."
-                            .to_string(),
-                    ),
-                );
+                if let Err(error) = dodo::cancel_subscription(&config, &subscription_id).await {
+                    eprintln!("[auth] subscription cancellation failed: {error}");
+                    return account_view(
+                        cx,
+                        user,
+                        None,
+                        Some(
+                            "Could not cancel your subscription. Open billing and cancel it first."
+                                .to_string(),
+                        ),
+                    );
+                }
             }
 
             audit(cx, pool, Some(user.id), "subscription_cancelled").await;

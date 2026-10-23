@@ -28,6 +28,10 @@ pub async fn connect() -> Result<PgPool> {
         .bind(now)
         .execute(&pool)
         .await?;
+    sqlx::query("DELETE FROM email_change_tokens WHERE expires_at <= $1")
+        .bind(now)
+        .execute(&pool)
+        .await?;
     sqlx::query("DELETE FROM rate_limits WHERE window_start < $1")
         .bind(now - 86_400)
         .execute(&pool)

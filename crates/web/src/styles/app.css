@@ -60,6 +60,27 @@
   --color-outline-variant: #5b625b;
 }
 
+/* Auth and recovery pages have no client theme script. Follow the system
+   preference there; the journal still starts light and lets its client apply
+   the saved preference. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    color-scheme: dark;
+    --color-surface: #1a1716;
+    --color-surface-container-low: #211d1b;
+    --color-surface-container: #26211f;
+    --color-surface-container-high: #332c29;
+    --color-surface-container-lowest: #2a2522;
+    --color-on-surface: #f7f0ec;
+    --color-on-surface-variant: #ddd5cf;
+    --color-primary: #b8dcc5;
+    --color-on-primary: #10281b;
+    --color-secondary: #ffc4a8;
+    --color-outline: #aab0a9;
+    --color-outline-variant: #5b625b;
+  }
+}
+
 @layer base {
   html {
     color-scheme: light;

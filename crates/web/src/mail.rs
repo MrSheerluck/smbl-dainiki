@@ -54,6 +54,18 @@ pub async fn send_verification(to: &str, link: &str) -> Result<()> {
     send(to, "Verify your Dainiki email", &body).await
 }
 
+pub async fn send_email_change(to: &str, link: &str) -> Result<()> {
+    let body = format!(
+        "Confirm the new email address for your Dainiki account.\n\n\
+         Open this link to finish the change:\n\n\
+         {link}\n\n\
+         This link expires in 24 hours. If you did not request this, \
+         no action is needed and your current email stays unchanged.\n"
+    );
+
+    send(to, "Confirm your new Dainiki email", &body).await
+}
+
 pub async fn send_password_reset(to: &str, link: &str) -> Result<()> {
     let body = format!(
         "Someone requested a password reset for your Dainiki account.\n\n\

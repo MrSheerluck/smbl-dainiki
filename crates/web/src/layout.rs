@@ -15,6 +15,7 @@ pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
         "/signup" => "Create a sync account · Dainiki",
         "/signin" => "Sign in · Dainiki",
         "/verify-email" => "Verify email · Dainiki",
+        "/verify-email-change" => "Confirm email change · Dainiki",
         "/forgot-password" => "Reset password · Dainiki",
         "/reset-password" => "Choose a new password · Dainiki",
         "/account" => "Account · Dainiki",
@@ -23,7 +24,12 @@ pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
 
     Ok(view! {
         <!DOCTYPE html>
-        <html lang="en" data-theme="light">
+        <html
+            lang="en"
+            if journal {
+                data-theme="light"
+            }
+        >
             <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">

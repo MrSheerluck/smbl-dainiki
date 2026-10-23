@@ -16,5 +16,29 @@ services:
       timeout: 3s
       retries: 20
 
+  app:
+    build: .
+    profiles: ["full"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://dainiki:dainiki@db:5432/dainiki
+      APP_BASE_URL: http://127.0.0.1:3000
+      AUTH_EMAIL_MODE: file
+      MAIL_OUTBOX_DIR: /app/data/outbox
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - dainiki-outbox:/app/data/outbox
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
 volumes:
   dainiki-postgres:
+  dainiki-outbox:

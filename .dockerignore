@@ -1,0 +1,15 @@
+.git
+.gitignore
+target
+landing/target
+landing/deploy/public
+landing/data
+docs
+data
+web/client/pkg
+.env
+.env.*
+!.env.example
+.DS_Store
+__pycache__
+*.pyc

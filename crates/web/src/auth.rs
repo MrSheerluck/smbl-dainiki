@@ -29,6 +29,7 @@ use topcoat::{
 use crate::mail;
 
 const SESSION_LIFETIME: Duration = Duration::from_secs(60 * 60 * 24 * 30);
+const SESSION_REFRESH_WINDOW_SECS: i64 = 60 * 60 * 24 * 7;
 const VERIFICATION_LIFETIME_SECS: i64 = 60 * 60 * 24;
 const RESET_LIFETIME_SECS: i64 = 60 * 30;
 const HASH_MEMORY_KIB: u32 = 64 * 1024;
@@ -193,6 +194,13 @@ pub(crate) struct ChangePasswordForm {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct ChangeEmailForm {
+    csrf_token: String,
+    new_email: String,
+    current_password: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct DeleteAccountForm {
     csrf_token: String,
     password: String,
@@ -205,20 +213,38 @@ pub async fn current_user(cx: &Cx) -> Result<Option<CurrentUser>> {
     };
 
     let pool = app_context::<PgPool>(cx);
-    let row: Option<(i64, String, Option<String>, Option<i64>, Option<String>)> = sqlx::query_as(
-        "SELECT u.id, u.email, u.plan, u.email_verified_at, s.csrf_token
-         FROM sessions s
-         JOIN users u ON u.id = s.user_id
-         WHERE s.token_hash = $1 AND s.expires_at > $2",
-    )
-    .bind(token_hash.to_vec())
-    .bind(now_seconds())
-    .fetch_optional(pool)
-    .await?;
+    let now = now_seconds();
+    let row: Option<(i64, String, Option<String>, Option<i64>, Option<String>, i64)> =
+        sqlx::query_as(
+            "SELECT u.id, u.email, u.plan, u.email_verified_at, s.csrf_token, s.expires_at
+             FROM sessions s
+             JOIN users u ON u.id = s.user_id
+             WHERE s.token_hash = $1 AND s.expires_at > $2",
+        )
+        .bind(token_hash.to_vec())
+        .bind(now)
+        .fetch_optional(pool)
+        .await?;
 
-    let Some((id, email, plan, verified_at, csrf_token)) = row else {
+    let Some((id, email, plan, verified_at, csrf_token, expires_at)) = row else {
         return Ok(None);
     };
+
+    if expires_at - now <= SESSION_REFRESH_WINDOW_SECS {
+        if let Some(refreshed) = session::refresh(cx).await? {
+            let new_expiry = refreshed
+                .expires_at
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_secs() as i64)
+                .unwrap_or(expires_at);
+
+            sqlx::query("UPDATE sessions SET expires_at = $2 WHERE token_hash = $1")
+                .bind(token_hash.to_vec())
+                .bind(new_expiry)
+                .execute(pool)
+                .await?;
+        }
+    }
 
     let csrf_token = match csrf_token {
         Some(token) if !token.is_empty() => token,
@@ -681,6 +707,130 @@ pub async fn change_password(
     Err(see_other("/account?notice=password-changed").into())
 }
 
+#[page(POST "/account/email")]
+pub async fn change_email(cx: &Cx, Form(input): Form<ChangeEmailForm>) -> Result<impl View> {
+    let user = require_user(cx).await?;
+
+    if !csrf_matches(&user.csrf_token, &input.csrf_token) {
+        return Err(forbidden().into());
+    }
+
+    let pool = app_context::<PgPool>(cx);
+    if !rate_limit_allows(pool, &format!("email-change:user:{}", user.id), 5, 3600).await? {
+        return account_view(
+            cx,
+            user,
+            None,
+            Some("Too many email change requests. Try again later.".to_string()),
+        );
+    }
+
+    let new_email = match normalize_email(&input.new_email) {
+        Ok(email) => email,
+        Err(message) => return account_view(cx, user, None, Some(message.to_string())),
+    };
+
+    if new_email == user.email.to_lowercase() {
+        return account_view(
+            cx,
+            user,
+            None,
+            Some("That is already your email address.".to_string()),
+        );
+    }
+
+    let taken: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM users WHERE email_normalized = $1 AND id <> $2)",
+    )
+    .bind(&new_email)
+    .bind(user.id)
+    .fetch_one(pool)
+    .await?;
+
+    if taken {
+        return account_view(
+            cx,
+            user,
+            None,
+            Some("That email address is already in use.".to_string()),
+        );
+    }
+
+    let row: Option<(String,)> = sqlx::query_as("SELECT password_hash FROM users WHERE id = $1")
+        .bind(user.id)
+        .fetch_optional(pool)
+        .await?;
+    let Some((current_hash,)) = row else {
+        return Err(see_other("/signin").into());
+    };
+
+    if !verify_password_async(input.current_password, current_hash).await {
+        return account_view(
+            cx,
+            user,
+            None,
+            Some("Your password is incorrect.".to_string()),
+        );
+    }
+
+    if let Err(error) = send_email_change_link(cx, user.id, &new_email).await {
+        eprintln!("[auth] could not send email change link: {error}");
+        return account_view(
+            cx,
+            user,
+            None,
+            Some("Could not send the confirmation email. Try again shortly.".to_string()),
+        );
+    }
+
+    audit(cx, pool, Some(user.id), "email_change_requested").await;
+    account_view(
+        cx,
+        user,
+        Some("Confirmation sent. Check the new inbox to finish the change.".to_string()),
+        None,
+    )
+}
+
+#[page("/verify-email-change")]
+pub async fn verify_email_change(
+    cx: &Cx,
+    query: Option<Form<TokenQuery>>,
+) -> Result<impl View> {
+    let token = query
+        .and_then(|Form(query)| query.token)
+        .unwrap_or_default();
+
+    match consume_email_change_token(cx, &token).await? {
+        EmailChangeOutcome::Changed(user_id) => {
+            let pool = app_context::<PgPool>(cx);
+            let _ = session::stop(cx).await;
+            audit(cx, pool, Some(user_id), "email_changed").await;
+            auth_notice(
+                cx,
+                "Email changed",
+                "Your account email is updated. Sign in again with the new address.",
+                "/signin?notice=email-changed",
+                "Sign in",
+            )
+        }
+        EmailChangeOutcome::Taken => auth_notice(
+            cx,
+            "Email unavailable",
+            "That address is already in use. Sign in and choose a different one.",
+            "/account",
+            "Go to account",
+        ),
+        EmailChangeOutcome::Invalid => auth_notice(
+            cx,
+            "This link has expired",
+            "That email change link is invalid or has already been used.",
+            "/signin",
+            "Go to sign in",
+        ),
+    }
+}
+
 #[page(POST "/account/delete")]
 pub async fn delete_account(
     cx: &Cx,
@@ -799,6 +949,114 @@ async fn send_verification_email(cx: &Cx, user_id: i64, email: &str) -> Result<(
     let token = create_auth_token(cx, user_id, "verify_email", VERIFICATION_LIFETIME_SECS).await?;
     let link = format!("{}/verify-email?token={token}", base_url());
     mail::send_verification(email, &link).await
+}
+
+async fn send_email_change_link(cx: &Cx, user_id: i64, new_email: &str) -> Result<()> {
+    let pool = app_context::<PgPool>(cx);
+    let now = now_seconds();
+    let token = random_token();
+    let hash = token_hash(&token);
+
+    sqlx::query(
+        "UPDATE email_change_tokens SET consumed_at = $2
+         WHERE user_id = $1 AND consumed_at IS NULL",
+    )
+    .bind(user_id)
+    .bind(now)
+    .execute(pool)
+    .await?;
+    sqlx::query("DELETE FROM email_change_tokens WHERE expires_at <= $1")
+        .bind(now)
+        .execute(pool)
+        .await?;
+    sqlx::query(
+        "INSERT INTO email_change_tokens
+             (user_id, token_hash, new_email, new_email_normalized, expires_at)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(user_id)
+    .bind(hash)
+    .bind(new_email)
+    .bind(new_email)
+    .bind(now + VERIFICATION_LIFETIME_SECS)
+    .execute(pool)
+    .await?;
+
+    let link = format!("{}/verify-email-change?token={token}", base_url());
+    mail::send_email_change(new_email, &link).await
+}
+
+enum EmailChangeOutcome {
+    Changed(i64),
+    Taken,
+    Invalid,
+}
+
+async fn consume_email_change_token(cx: &Cx, token: &str) -> Result<EmailChangeOutcome> {
+    if token.is_empty() {
+        return Ok(EmailChangeOutcome::Invalid);
+    }
+
+    let pool = app_context::<PgPool>(cx);
+    let now = now_seconds();
+    let mut tx = pool.begin().await?;
+    let row: Option<(i64, i64, String, String)> = sqlx::query_as(
+        "SELECT id, user_id, new_email, new_email_normalized
+         FROM email_change_tokens
+         WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > $2
+         FOR UPDATE",
+    )
+    .bind(token_hash(token))
+    .bind(now)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let Some((token_id, user_id, new_email, new_email_normalized)) = row else {
+        return Ok(EmailChangeOutcome::Invalid);
+    };
+
+    let taken: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM users WHERE email_normalized = $1 AND id <> $2)",
+    )
+    .bind(&new_email_normalized)
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    if taken {
+        sqlx::query("UPDATE email_change_tokens SET consumed_at = $2 WHERE id = $1")
+            .bind(token_id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        return Ok(EmailChangeOutcome::Taken);
+    }
+
+    sqlx::query(
+        "UPDATE users
+         SET email = $2, email_normalized = $3,
+             email_verified_at = $4, updated_at = $4
+         WHERE id = $1",
+    )
+    .bind(user_id)
+    .bind(new_email)
+    .bind(new_email_normalized)
+    .bind(now)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query("UPDATE email_change_tokens SET consumed_at = $2 WHERE id = $1")
+        .bind(token_id)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM sessions WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+
+    Ok(EmailChangeOutcome::Changed(user_id))
 }
 
 async fn send_reset_email(cx: &Cx, user_id: i64, email: &str) -> Result<()> {
@@ -1053,6 +1311,9 @@ fn account_notice(key: Option<&str>) -> Option<String> {
         Some("password-changed") => {
             Some("Password changed. Other sessions were signed out.".to_string())
         }
+        Some("email-change-sent") => {
+            Some("Confirmation sent. Check the new inbox to finish the change.".to_string())
+        }
         _ => None,
     }
 }
@@ -1061,6 +1322,9 @@ fn signin_notice(key: Option<&str>) -> Option<String> {
     match key {
         Some("password-reset") => {
             Some("Password updated. Sign in with your new password.".to_string())
+        }
+        Some("email-changed") => {
+            Some("Email updated. Sign in with your new address.".to_string())
         }
         _ => None,
     }
@@ -1837,7 +2101,7 @@ fn account_view(
                             <dt class="font-ui text-ui-label text-on-surface-variant">
                                 "Email"
                             </dt>
-                            <dd class="text-right font-ui text-ui-body text-on-surface">
+                            <dd class="break-all text-right font-ui text-ui-body text-on-surface">
                                 (email)
                             </dd>
                         </div>
@@ -1878,6 +2142,63 @@ fn account_view(
                             </dd>
                         </div>
                     </dl>
+
+                    <section class="mt-8 border-t border-outline-variant/30 pt-6">
+                        <h2 class="font-display text-xl text-on-surface">
+                            "Email address"
+                        </h2>
+                        <p class="mt-1 font-ui text-ui-body text-on-surface-variant">
+                            "We'll send a confirmation link to the new address. Your current email stays active until you confirm."
+                        </p>
+                        <form
+                            method="post"
+                            action="/account/email"
+                            class="mt-4 space-y-3"
+                        >
+                            <input
+                                type="hidden"
+                                name="csrf_token"
+                                value=(csrf_token.clone())
+                            >
+                            <label class="block">
+                                <span
+                                    class="font-ui text-ui-label text-on-surface-variant"
+                                >
+                                    "New email"
+                                </span>
+                                <input
+                                    id="new-email"
+                                    name="new_email"
+                                    type="email"
+                                    autocomplete="email"
+                                    required="true"
+                                    class="mt-1 w-full rounded border border-outline-variant/60 bg-surface px-3 py-2 font-ui text-ui-body text-on-surface outline-none focus:border-primary"
+                                >
+                            </label>
+                            <label class="block">
+                                <span
+                                    class="font-ui text-ui-label text-on-surface-variant"
+                                >
+                                    "Current password"
+                                </span>
+                                <input
+                                    id="email-password"
+                                    name="current_password"
+                                    type="password"
+                                    autocomplete="current-password"
+                                    required="true"
+                                    class="mt-1 w-full rounded border border-outline-variant/60 bg-surface px-3 py-2 font-ui text-ui-body text-on-surface outline-none focus:border-primary"
+                                >
+                            </label>
+                            <button
+                                id="change-email"
+                                type="submit"
+                                class="rounded bg-primary px-4 py-2 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+                            >
+                                "Send confirmation"
+                            </button>
+                        </form>
+                    </section>
 
                     <section class="mt-8 border-t border-outline-variant/30 pt-6">
                         <h2 class="font-display text-xl text-on-surface">"Password"</h2>

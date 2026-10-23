@@ -61,6 +61,17 @@ Run the browser suites with the server running:
 python3 -m unittest discover -s tests/e2e -p 'test_*.py' -v
 ```
 
+The full app and database can also run in Docker:
+
+```sh
+docker compose --profile full up -d --build
+```
+
+This builds the WASM client, the Topcoat server, and a Postgres 17 database.
+The app is at <http://127.0.0.1:3000>; `/api/health` and `/api/ready` are
+available for container checks. Local verification mail is stored in the
+`dainiki-outbox` volume.
+
 ## Status
 
 The landing page is live. The local-first journal MVP is complete and awaiting

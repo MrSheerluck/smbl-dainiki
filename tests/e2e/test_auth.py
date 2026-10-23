@@ -203,6 +203,34 @@ class DainikiAuthE2E(unittest.TestCase):
         self.goto("/account")
         self.assertEqual(self.page.url, f"{BASE_URL}/signin")
 
+    def test_email_change_requires_confirmation(self):
+        old_email = self.email()
+        new_email = self.email()
+        self.signup(old_email)
+        self.verify_email(old_email)
+        self.goto("/account")
+
+        self.page.fill("#new-email", new_email)
+        self.page.fill("#email-password", PASSWORD)
+        self.page.click("#change-email")
+        self.page.wait_for_load_state("networkidle")
+        self.assertIn("Confirmation sent", self.page.locator("body").inner_text())
+
+        self.page.goto(
+            self.link_from_email(new_email, "verify-email-change"),
+            wait_until="networkidle",
+        )
+        self.assertEqual(self.page.locator("h1").inner_text(), "Email changed")
+
+        self.signin(old_email)
+        self.assertIn("incorrect", self.page.locator('[role="alert"]').inner_text())
+        self.page.fill("#signin-email", new_email)
+        self.page.fill("#signin-password", PASSWORD)
+        self.page.click("#signin-submit")
+        self.page.wait_for_load_state("networkidle")
+        self.assertEqual(self.page.url.split("?")[0], f"{BASE_URL}/account")
+        self.assertIn(new_email, self.page.locator("dl").inner_text())
+
     def test_password_mismatch_is_rejected(self):
         email = self.email()
         self.goto("/signup")

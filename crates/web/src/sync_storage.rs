@@ -16,8 +16,6 @@ pub struct SyncStorage {
 struct S3 {
     client: Client,
     bucket: String,
-    endpoint: String,
-    public_endpoint: String,
 }
 
 impl SyncStorage {
@@ -39,7 +37,6 @@ impl SyncStorage {
         };
 
         let region = env::var("R2_REGION").unwrap_or_else(|_| "auto".to_string());
-        let public_endpoint = env::var("R2_PUBLIC_ENDPOINT").unwrap_or_else(|_| endpoint.clone());
         let force_path_style = env::var("R2_FORCE_PATH_STYLE")
             .map(|value| value != "false" && value != "0")
             .unwrap_or(true);
@@ -63,8 +60,6 @@ impl SyncStorage {
             inner: Some(S3 {
                 client: Client::from_conf(config),
                 bucket,
-                endpoint,
-                public_endpoint,
             }),
         }
     }
@@ -86,7 +81,7 @@ impl SyncStorage {
             .await
             .map_err(|error| error.to_string())?;
 
-        Ok(inner.public_url(request.uri()))
+        Ok(request.uri().to_string())
     }
 
     pub async fn presign_get(&self, key: &str) -> Result<String, String> {
@@ -102,7 +97,7 @@ impl SyncStorage {
             .await
             .map_err(|error| error.to_string())?;
 
-        Ok(inner.public_url(request.uri()))
+        Ok(request.uri().to_string())
     }
 
     pub async fn put(&self, key: &str, bytes: Vec<u8>) -> Result<(), String> {
@@ -153,17 +148,3 @@ impl SyncStorage {
     }
 }
 
-impl S3 {
-    fn public_url(&self, url: &str) -> String {
-        let endpoint = self.endpoint.trim_end_matches('/');
-        let public_endpoint = self.public_endpoint.trim_end_matches('/');
-
-        if endpoint != public_endpoint {
-            if let Some(rest) = url.strip_prefix(endpoint) {
-                return format!("{public_endpoint}{rest}");
-            }
-        }
-
-        url.to_string()
-    }
-}

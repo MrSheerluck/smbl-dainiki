@@ -88,6 +88,28 @@ Create two recurring products in Dodo (monthly $2, yearly $20), then point the
 webhook endpoint at `/api/billing/webhook` and subscribe it to the
 `subscription.*` events. Dodo is the merchant of record and handles tax.
 
+Encrypted sync uses S3-compatible object storage. Local development runs
+RustFS on `127.0.0.1:9000` and creates the private `dainiki-sync` bucket with
+CORS for the app origins. The app gets short-lived presigned PUT/GET URLs and
+stores only ciphertext in the bucket; Postgres keeps opaque metadata, quota,
+and revisions. Configure production Cloudflare R2 with:
+
+```sh
+SYNC_STORAGE=s3
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET=dainiki-sync
+R2_REGION=auto
+R2_FORCE_PATH_STYLE=true
+```
+
+The endpoint must be reachable by both the server and the browser, because the
+presigned URL is signed for that host. Add a bucket CORS rule for the app origin
+with `GET`, `PUT`, and `HEAD`, allow all request headers, and expose `ETag`.
+Keep the bucket private. A missing or invalid storage configuration leaves local
+journaling untouched and disables sync in the UI.
+
 The Dodo CLI can create and manage products, open checkout sessions, and
 forward test webhooks to localhost:
 

@@ -2,12 +2,14 @@ FROM rust:1.99-bookworm AS builder
 
 WORKDIR /app
 
-RUN cargo install wasm-pack --version 0.15.0 --locked
+RUN cargo install wasm-pack --version 0.15.0 --locked \
+    && cargo install topcoat-cli --version 0.10.0 --locked
 
 COPY . .
 
 RUN wasm-pack build crates/client --target web --out-dir ../../web/client/pkg
 RUN cargo build --release -p dainiki-web
+RUN topcoat asset bundle -p dainiki-web --release
 
 FROM debian:bookworm-slim
 
@@ -18,6 +20,7 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY --from=builder /app/target/release/dainiki-web /usr/local/bin/dainiki-web
+COPY --from=builder /app/target/release/assets /usr/local/bin/assets
 COPY --from=builder /app/web/client /app/web/client
 
 ENV HOST=0.0.0.0

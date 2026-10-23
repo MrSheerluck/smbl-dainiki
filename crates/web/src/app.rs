@@ -16,11 +16,19 @@ pub async fn timeline() -> Result<impl View> {
             ></div>
             <div class="flex min-w-0 flex-1 flex-col lg:min-h-0">
                 topbar()
-                <main class="flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:min-h-0 lg:overflow-y-auto lg:px-10">
+                <main
+                    class="flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:min-h-0 lg:overflow-y-auto lg:px-10"
+                >
                     <div class="mx-auto space-y-8">
                         today_entry()
-                        <div id="active-filter" hidden="true" class="flex items-center gap-2">
-                            <span class="font-ui text-ui-label text-on-surface-variant/60">
+                        <div
+                            id="active-filter"
+                            hidden="true"
+                            class="flex items-center gap-2"
+                        >
+                            <span
+                                class="font-ui text-ui-label text-on-surface-variant/60"
+                            >
                                 "Filtered by"
                             </span>
                             <button
@@ -54,7 +62,9 @@ pub async fn welcome_overlay() -> Result<impl View> {
             aria-labelledby="welcome-title"
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
         >
-            <div class="w-full max-w-md rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-2xl">
+            <div
+                class="w-full max-w-md rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-2xl"
+            >
                 <p class="font-ui text-[10px] uppercase tracking-[0.16em] text-primary">
                     "Local-first journal"
                 </p>
@@ -101,8 +111,12 @@ pub async fn data_overlay() -> Result<impl View> {
             aria-label="Import and export"
             class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
         >
-            <div class="w-full max-w-md overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl">
-                <div class="flex items-center justify-between border-b border-outline-variant/40 px-5 py-3">
+            <div
+                class="w-full max-w-md overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+            >
+                <div
+                    class="flex items-center justify-between border-b border-outline-variant/40 px-5 py-3"
+                >
                     <h2 class="font-display text-lg text-on-surface">"Data"</h2>
                     <button
                         id="close-data"
@@ -172,7 +186,9 @@ pub async fn search_overlay() -> Result<impl View> {
             aria-label="Search entries"
             class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
         >
-            <div class="w-full max-w-xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl">
+            <div
+                class="w-full max-w-xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+            >
                 <input
                     id="search-input"
                     type="text"
@@ -185,7 +201,9 @@ pub async fn search_overlay() -> Result<impl View> {
                     id="search-results"
                     class="max-h-80 overflow-y-auto border-t border-outline-variant/40"
                 ></div>
-                <div class="flex items-center justify-between border-t border-outline-variant/40 px-5 py-2 font-ui text-[10px] text-on-surface-variant/50">
+                <div
+                    class="flex items-center justify-between border-t border-outline-variant/40 px-5 py-2 font-ui text-[10px] text-on-surface-variant/50"
+                >
                     <span>"Esc to close"</span>
                     <span>"↑↓ to move · ↵ to open"</span>
                 </div>
@@ -219,9 +237,15 @@ pub async fn today_entry() -> Result<impl View> {
                 </span>
             </div>
 
-            <div class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6">
-                <span class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"></span>
-                <div class="rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm sm:p-6">
+            <div
+                class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6"
+            >
+                <span
+                    class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
+                ></span>
+                <div
+                    class="rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm sm:p-6"
+                >
                     <div class="mb-4 flex items-center justify-end gap-2">
                         <button
                             id="prev-day"
@@ -259,7 +283,9 @@ pub async fn today_entry() -> Result<impl View> {
                         aria-label="Journal entry"
                     ></div>
 
-                    <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/30 pt-3">
+                    <div
+                        class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/30 pt-3"
+                    >
                         <div
                             id="entry-status"
                             class="font-ui text-ui-label text-on-surface-variant/70"
@@ -267,10 +293,7 @@ pub async fn today_entry() -> Result<impl View> {
                         >
                             "Loading…"
                         </div>
-                        <div
-                            id="entry-tags"
-                            class="flex flex-wrap items-center gap-3"
-                        ></div>
+                        <div id="entry-tags" class="flex flex-wrap items-center gap-3"></div>
                     </div>
                 </div>
             </div>
@@ -281,17 +304,25 @@ pub async fn today_entry() -> Result<impl View> {
 #[component]
 pub async fn sidebar() -> Result<impl View> {
     Ok(view! {
-        <aside class="fixed inset-y-0 left-0 z-40 hidden h-screen w-[230px] shrink-0 flex-col border-r border-outline-variant/40 bg-surface-container-low/70 lg:static lg:z-auto lg:flex">
+        <aside
+            class="fixed inset-y-0 left-0 z-40 hidden h-screen w-[230px] shrink-0 flex-col border-r border-outline-variant/40 bg-surface-container-low/70 lg:static lg:z-auto lg:flex"
+        >
             <div class="min-h-0 flex-1 overflow-hidden px-3 py-4">
                 <div class="flex items-center gap-3 px-2">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-sm bg-primary font-display text-lg text-on-primary">
+                    <div
+                        class="flex h-9 w-9 items-center justify-center rounded-sm bg-primary font-display text-lg text-on-primary"
+                    >
                         "D"
                     </div>
                     <div>
-                        <p class="font-ui text-sm font-semibold leading-none tracking-tight text-on-surface">
+                        <p
+                            class="font-ui text-sm font-semibold leading-none tracking-tight text-on-surface"
+                        >
                             "Dainiki"
                         </p>
-                        <p class="mt-1 font-ui text-[9px] uppercase tracking-[0.14em] text-on-surface-variant">
+                        <p
+                            class="mt-1 font-ui text-[9px] uppercase tracking-[0.14em] text-on-surface-variant"
+                        >
                             "A quiet journal"
                         </p>
                     </div>
@@ -347,7 +378,9 @@ pub async fn sidebar() -> Result<impl View> {
                             </svg>
                             <span>"Search"</span>
                         </span>
-                        <span class="rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/80">
+                        <span
+                            class="rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/80"
+                        >
                             "⌘K"
                         </span>
                     </button>
@@ -355,7 +388,9 @@ pub async fn sidebar() -> Result<impl View> {
 
                 <div class="mt-6">
                     <div class="flex items-center justify-between px-2 pb-1">
-                        <h2 class="font-ui text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant/80">
+                        <h2
+                            class="font-ui text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant/80"
+                        >
                             "Tags"
                         </h2>
                         <button
@@ -366,7 +401,9 @@ pub async fn sidebar() -> Result<impl View> {
                         </button>
                     </div>
                     <div id="tag-list" class="space-y-0.5">
-                        <p class="px-2 py-1 font-ui text-[10px] text-on-surface-variant/50">
+                        <p
+                            class="px-2 py-1 font-ui text-[10px] text-on-surface-variant/50"
+                        >
                             "Loading…"
                         </p>
                     </div>
@@ -409,10 +446,39 @@ pub async fn sidebar() -> Result<impl View> {
                         </svg>
                         <span>"Settings"</span>
                     </button>
-                    <span class="rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/70">
+                    <span
+                        class="rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/70"
+                    >
                         "⌘,"
                     </span>
                 </div>
+
+                <a
+                    href="/signup"
+                    class="flex items-center justify-between px-1 font-ui text-ui-label text-on-surface-variant hover:text-on-surface"
+                >
+                    <span class="flex items-center gap-2">
+                        <svg
+                            aria-hidden="true"
+                            class="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                        >
+                            <path
+                                d="M7 18a4 4 0 0 1-.6-7.96A6 6 0 0 1 18 8.5a4.5 4.5 0 0 1 1 8.9"
+                            ></path>
+                            <path d="M12 12v8"></path>
+                            <path d="m8.5 15.5 3.5-3.5 3.5 3.5"></path>
+                        </svg>
+                        <span>"Enable sync"</span>
+                    </span>
+                    <span class="font-ui text-[10px] text-on-surface-variant/50">
+                        "Paid"
+                    </span>
+                </a>
 
                 <div class="flex items-center justify-between px-1">
                     <button
@@ -454,7 +520,9 @@ pub async fn sidebar() -> Result<impl View> {
 #[component]
 pub async fn topbar() -> Result<impl View> {
     Ok(view! {
-        <header class="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-outline-variant/40 px-6">
+        <header
+            class="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-outline-variant/40 px-6"
+        >
             <div class="flex items-center gap-2">
                 <button
                     id="open-sidebar"
@@ -464,7 +532,9 @@ pub async fn topbar() -> Result<impl View> {
                 >
                     "☰"
                 </button>
-                <div class="hidden shrink-0 items-center gap-2 font-ui text-ui-label text-on-surface-variant/70 sm:flex">
+                <div
+                    class="hidden shrink-0 items-center gap-2 font-ui text-ui-label text-on-surface-variant/70 sm:flex"
+                >
                     <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
                     "Local · saved"
                 </div>
@@ -477,7 +547,9 @@ pub async fn topbar() -> Result<impl View> {
                     class="flex w-full max-w-sm items-center gap-3 rounded-full border border-outline-variant/50 bg-surface-container-lowest px-4 py-2 text-left font-ui text-ui-body text-on-surface-variant hover:border-outline"
                 >
                     <span>"Search entries…"</span>
-                    <span class="ml-auto rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/80">
+                    <span
+                        class="ml-auto rounded bg-surface-container px-1.5 py-0.5 font-mono text-[9px] text-on-surface-variant/80"
+                    >
                         "⌘K"
                     </span>
                 </button>

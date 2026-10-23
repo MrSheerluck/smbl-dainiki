@@ -34,13 +34,27 @@ Open <http://127.0.0.1:3000>.
 The journal app lives in `crates/web`. Build the Rust/WASM client first, then
 run the Topcoat server from the repo root:
 
+Start Postgres first, then build the client and run the server:
+
 ```sh
+docker compose up -d db
 wasm-pack build crates/client --target web --out-dir ../../web/client/pkg
 topcoat dev -p dainiki-web
 ```
 
 Open <http://127.0.0.1:3000>. Entries are stored in the browser's Origin Private
 File System as `journal/YYYY/MM/YYYY-MM-DD.md`.
+
+The default `DATABASE_URL` points at the local Compose database. Override it in
+a `.env` file when needed; `.env.example` has the defaults. Sqlx migrations run
+when the server starts. The app remains usable without an account; auth pages
+live at `/signup` and `/signin`.
+
+Run the browser suites with the server running:
+
+```sh
+python3 -m unittest discover -s tests/e2e -p 'test_*.py' -v
+```
 
 ## Status
 
@@ -67,7 +81,12 @@ manual sign-off:
 - Ten local end-to-end browser tests covering storage, editing, search, themes,
   conflicts, import/export, offline mode, and mobile.
 
-Next: accounts and auth, then encrypted sync and billing.
+Accounts and auth are in progress: email/password signup, Argon2id hashing,
+Postgres-backed sessions, signin, signout, and an account page are working.
+Email verification, password reset, CSRF hardening, rate limiting, and billing
+come next, followed by encrypted sync.
+
+Next: finish auth, then encrypted sync and billing.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root
@@ -76,7 +95,7 @@ documentation.
 ## Planned stack
 
 - Rust + [Topcoat](https://github.com/tokio-rs/topcoat)
-- SQLite
+- Postgres 17 + SQLx, run with Docker Compose
 - Tailwind CSS
 - Rust/WASM browser client (`web-sys`)
 - Cloudflare R2 for encrypted paid sync

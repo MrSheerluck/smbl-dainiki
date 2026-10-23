@@ -7,6 +7,10 @@ publish = false
 [dependencies]
 topcoat = { version = "0.10.0", features = ["tailwind", "fs"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros", "tls-rustls-ring"] }
+argon2 = "0.6"
+serde = { version = "1.0.229", features = ["derive"] }
+dotenvy = "0.15.7"
 
 [build-dependencies]
 topcoat = { version = "0.10.0", default-features = false, features = ["tailwind"] }

@@ -323,6 +323,12 @@ async fn get_object_bytes(url: &str) -> Result<Vec<u8>, SyncError> {
         .await
         .map_err(|error| SyncError::Message(format!("Could not download sync object: {error}")))?;
 
+    if response.status() == 404 {
+        return Err(SyncError::Message(
+            "Encrypted sync data is missing from object storage. Run Sync now to rebuild it from this device.".to_string(),
+        ));
+    }
+
     if !response.ok() {
         return Err(response_error(response).await);
     }

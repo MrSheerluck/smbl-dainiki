@@ -527,7 +527,11 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
                 return;
             }
 
-            let Ok(Some(link)) = target.closest("[data-iso]") else {
+            if target.closest("a[href]").ok().flatten().is_some() {
+                return;
+            }
+
+            let Ok(Some(link)) = target.closest("[data-entry-card][data-iso]") else {
                 return;
             };
 
@@ -537,6 +541,34 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
 
             event.prevent_default();
             spawn_result(start_inline_edit(timeline_state.clone(), iso));
+        }),
+    )?;
+
+    let timeline_key_state = state.clone();
+    listen(
+        state.borrow().timeline.as_ref(),
+        "keydown",
+        Closure::<dyn FnMut(Event)>::new(move |event: Event| {
+            let Ok(event) = event.dyn_into::<KeyboardEvent>() else {
+                return;
+            };
+
+            if event.key() != "Enter" && event.key() != " " {
+                return;
+            }
+
+            let Some(target) = target_element(&event) else {
+                return;
+            };
+            let Ok(Some(card)) = target.closest("[data-entry-card][data-iso]") else {
+                return;
+            };
+            let Some(iso) = card.get_attribute("data-iso") else {
+                return;
+            };
+
+            event.prevent_default();
+            spawn_result(start_inline_edit(timeline_key_state.clone(), iso));
         }),
     )?;
 
@@ -3294,7 +3326,7 @@ fn open_entry(state: SharedState, iso: String) {
     }
 
     let timeline = state.borrow().timeline.clone();
-    let selector = format!("a[data-iso=\"{iso}\"]");
+    let selector = format!("[data-entry-card][data-iso=\"{iso}\"]");
     let mut link = timeline.query_selector(&selector).ok().flatten();
 
     if link.is_none() {
@@ -3336,7 +3368,9 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
         (text, state.timeline.clone())
     };
 
-    let Some(link) = timeline.query_selector(&format!("a[data-iso=\"{iso}\"]"))? else {
+    let Some(card) = timeline.query_selector(&format!(
+        "[data-entry-card][data-iso=\"{iso}\"]"
+    ))? else {
         return Ok(());
     };
 
@@ -3346,13 +3380,13 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
     let container = document.create_element("div")?;
     container.set_inner_html(&render::inline_editor());
 
-    let Some(parent) = link.parent_node() else {
+    let Some(parent) = card.parent_node() else {
         return Ok(());
     };
 
-    let reference = link.next_sibling();
+    let reference = card.next_sibling();
     parent.insert_before(container.as_ref(), reference.as_ref())?;
-    link.set_attribute("hidden", "true")?;
+    card.set_attribute("hidden", "true")?;
 
     let editor: HtmlElement = container
         .query_selector(".inline-live")?
@@ -3361,10 +3395,6 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
     let status = container
         .query_selector(".inline-status")?
         .ok_or_else(|| JsValue::from_str("missing inline status"))?;
-    let done = container
-        .query_selector(".inline-done")?
-        .ok_or_else(|| JsValue::from_str("missing inline done"))?;
-
     markdown::render_document(&editor, &text);
 
     let input_state = state.clone();
@@ -3436,23 +3466,6 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
         }),
     )?;
 
-    listen(
-        done.as_ref(),
-        "mousedown",
-        Closure::<dyn FnMut(Event)>::new(move |event: Event| {
-            event.prevent_default();
-        }),
-    )?;
-
-    let done_state = state.clone();
-    listen(
-        done.as_ref(),
-        "click",
-        Closure::<dyn FnMut(Event)>::new(move |_| {
-            spawn_result(finish_inline_edit(done_state.clone(), true));
-        }),
-    )?;
-
     if let Ok(Some(line)) = editor.query_selector(".line:last-child") {
         line.class_list().add_1("active").ok();
         place_caret(&document, &line, false);
@@ -3462,7 +3475,7 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
         let mut state = state.borrow_mut();
         state.inline_iso = Some(iso);
         state.inline_base = text.clone();
-        state.inline_link = Some(link);
+        state.inline_link = Some(card);
         state.inline_container = Some(container);
         state.inline_editor = Some(editor.clone());
         state.inline_status = Some(status);

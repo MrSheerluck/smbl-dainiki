@@ -30,11 +30,14 @@ pub fn timeline(
 
     for entry in visible.iter().take(limit) {
         let date = entry.meta.date;
-        let excerpt = escape_html(if entry.meta.excerpt.is_empty() {
-            "Empty entry"
+        let body = if entry.text.trim().is_empty() {
+            r#"<p class="font-journal text-journal text-on-surface-variant/50">Empty entry</p>"#.to_string()
         } else {
-            &entry.meta.excerpt
-        });
+            format!(
+                r#"<div class="live-editor font-journal text-journal text-on-surface">{}</div>"#,
+                crate::markdown::render_document_html(&entry.text)
+            )
+        };
 
         let mut tags = String::new();
         for tag in &entry.meta.tags {
@@ -55,20 +58,20 @@ pub fn timeline(
   </div>
   <div class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-6">
     <span class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"></span>
-    <a href="#entry-editor" data-iso="{iso}" aria-label="Open the entry for {weekday}, {month} {day}" class="block rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm transition-colors hover:border-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-6">
-      <p class="font-journal text-journal text-on-surface">{excerpt}</p>
+    <div data-entry-card="true" data-iso="{iso}" role="link" tabindex="0" aria-label="Open the entry for {weekday}, {month} {day}" class="block cursor-text rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm transition-colors hover:border-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-6">
+      {body}
       <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3">{tags}</div>
         <span class="font-ui text-[10px] text-on-surface-variant/50">{words} words</span>
       </div>
-    </a>
+    </div>
   </div>
 </article>"##,
             day = date.day(),
             weekday = weekday_name(date),
             month = month_year(date),
             iso = escape_html(&entry.iso),
-            excerpt = excerpt,
+            body = body,
             tags = tags,
             words = entry.meta.words,
         );
@@ -218,9 +221,7 @@ pub fn inline_editor() -> String {
   <div class="inline-live live-editor min-h-[10rem] w-full font-journal text-journal text-on-surface outline-none" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Edit entry"></div>
   <div class="mt-3 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-2">
     <span aria-live="polite" class="inline-status font-ui text-[10px] text-on-surface-variant/60">Editing</span>
-    <button type="button" class="inline-done rounded bg-primary px-3 py-1 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">
-      Done
-    </button>
+    <span class="font-ui text-[10px] text-on-surface-variant/40">Autosaves locally</span>
   </div>
 </div>"#
         .to_string()

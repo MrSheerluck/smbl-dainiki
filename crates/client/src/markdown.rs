@@ -2,6 +2,10 @@ use wasm_bindgen::JsCast;
 use web_sys::Element;
 
 pub fn render_document(editor: &Element, markdown: &str) {
+    editor.set_inner_html(&render_document_html(markdown));
+}
+
+pub fn render_document_html(markdown: &str) -> String {
     let mut html = String::new();
 
     for line in markdown.split('\n') {
@@ -9,7 +13,7 @@ pub fn render_document(editor: &Element, markdown: &str) {
         html.push_str(&format!(r#"<div class="line {class}">{inner}</div>"#));
     }
 
-    editor.set_inner_html(&html);
+    html
 }
 
 pub fn render_line_into(line: &Element, source: &str, active: bool) {

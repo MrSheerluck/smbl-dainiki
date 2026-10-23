@@ -783,6 +783,15 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
+    let delete_entry_state = state.clone();
+    listen(
+        element(document, "#delete-entry")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            spawn_result(delete_current_entry(delete_entry_state.clone()));
+        }),
+    )?;
+
     let import_file_state = state.clone();
     listen(
         state.borrow().import_file.as_ref(),
@@ -1335,12 +1344,103 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
         })
         .unwrap_or_default();
 
-    let mut dates: Vec<String> = local.keys().cloned().collect();
-    dates.sort();
-
     let mut uploaded = 0usize;
     let mut downloaded = 0usize;
     let mut conflicts = 0usize;
+    let mut deleted = 0usize;
+
+    let tombstones: Vec<ManifestEntry> = manifest_entries
+        .values()
+        .filter(|entry| entry.deleted)
+        .cloned()
+        .collect();
+
+    for tombstone in tombstones {
+        let created_after_delete = base_entries
+            .get(&tombstone.date)
+            .is_some_and(|entry| entry.deleted);
+
+        if created_after_delete {
+            continue;
+        }
+
+        if let Some(text) = local.remove(&tombstone.date) {
+            let local_hash = content_hash(&text);
+            let unchanged = base_entries
+                .get(&tombstone.date)
+                .is_some_and(|entry| entry.hash == local_hash);
+
+            if !unchanged {
+                opfs::write_conflict(&tombstone.date, &text)
+                    .await
+                    .map_err(js_message)?;
+                conflicts += 1;
+            }
+
+            opfs::delete_entry(&tombstone.date)
+                .await
+                .map_err(js_message)?;
+            deleted += 1;
+        }
+    }
+
+    let pending_deletions = load_sync_deletions();
+    let mut remaining_deletions = Vec::new();
+
+    for (index, iso) in pending_deletions.iter().enumerate() {
+        let remote = manifest_entries.get(iso).cloned();
+
+        if remote.as_ref().is_none_or(|entry| entry.deleted) {
+            continue;
+        }
+
+        let base_revision = remote.as_ref().map(|entry| entry.revision).unwrap_or(0);
+
+        match sync::delete_entry(iso, base_revision).await {
+            Ok(write) => {
+                manifest_entries.insert(
+                    iso.clone(),
+                    ManifestEntry {
+                        date: iso.clone(),
+                        hash: String::new(),
+                        size: 0,
+                        revision: write.revision,
+                        deleted: true,
+                    },
+                );
+                local.remove(iso);
+                deleted += 1;
+            }
+            Err(sync::SyncError::Conflict) => {
+                if sync::get_entry(iso)
+                    .await
+                    .map_err(|error| error.message())?
+                    .is_some()
+                {
+                    let mut preserved = HashMap::new();
+                    download_entry(&key, iso, &mut preserved, &mut manifest_entries).await?;
+                    if let Some(text) = preserved.remove(iso) {
+                        local.insert(iso.clone(), text);
+                    }
+                }
+
+                set_sync_message(
+                    &state,
+                    "An entry changed on another device while you were deleting it. The newer entry was kept.",
+                );
+            }
+            Err(error) => {
+                remaining_deletions.extend_from_slice(&pending_deletions[index..]);
+                save_sync_deletions(&remaining_deletions);
+                return Err(error.message());
+            }
+        }
+    }
+
+    save_sync_deletions(&remaining_deletions);
+
+    let mut dates: Vec<String> = local.keys().cloned().collect();
+    dates.sort();
 
     for iso in dates {
         let text = local.get(&iso).cloned().unwrap_or_default();
@@ -1378,6 +1478,7 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
                                 hash: write.hash,
                                 size: write.size as u64,
                                 revision: write.revision,
+                                deleted: false,
                             },
                         );
                         uploaded += 1;
@@ -1408,9 +1509,9 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
     }
 
     let remote_only: Vec<String> = manifest_entries
-        .keys()
-        .filter(|iso| !local.contains_key(*iso))
-        .cloned()
+        .iter()
+        .filter(|(iso, entry)| !entry.deleted && !local.contains_key(*iso))
+        .map(|(iso, _)| iso.clone())
         .collect();
 
     for iso in remote_only {
@@ -1465,6 +1566,9 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
     }
 
     let mut message = format!("Synced {uploaded} up, {downloaded} down.");
+    if deleted > 0 {
+        message.push_str(&format!(" {deleted} deleted."));
+    }
     if conflicts > 0 {
         message.push_str(&format!(" {conflicts} conflict copies saved."));
     }
@@ -1517,6 +1621,7 @@ async fn download_entry(
     if let Some(entry) = manifest_entries.get_mut(iso) {
         entry.revision = remote.revision;
         entry.hash = remote.hash;
+        entry.deleted = false;
     }
 
     Ok(())
@@ -1575,6 +1680,13 @@ fn sync_panel_html(state: &State) -> String {
 
         if state.sync_busy {
             html.push_str(r#"<p class="font-ui text-ui-body text-on-surface-variant">Working…</p>"#);
+            return html;
+        }
+
+        if !status.storage_ready {
+            html.push_str(
+                r#"<p class="font-ui text-ui-body text-on-surface-variant">Encrypted sync storage is not configured on this server. Local journaling is unaffected.</p>"#,
+            );
             return html;
         }
 
@@ -1664,6 +1776,29 @@ fn load_sync_base() -> Option<SyncManifest> {
         .and_then(|json| serde_json::from_str(&json).ok())
 }
 
+fn load_sync_deletions() -> Vec<String> {
+    local_storage()
+        .and_then(|storage| storage.get_item("dainiki-sync-deletions").ok().flatten())
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default()
+}
+
+fn save_sync_deletions(deletions: &[String]) {
+    if let Some(storage) = local_storage() {
+        if let Ok(json) = serde_json::to_string(deletions) {
+            storage.set_item("dainiki-sync-deletions", &json).ok();
+        }
+    }
+}
+
+fn queue_sync_delete(iso: &str) {
+    let mut deletions = load_sync_deletions();
+    if !deletions.iter().any(|date| date == iso) {
+        deletions.push(iso.to_string());
+        save_sync_deletions(&deletions);
+    }
+}
+
 fn save_sync_base(manifest: &SyncManifest) {
     if let Some(storage) = local_storage() {
         if let Ok(json) = serde_json::to_string(manifest) {
@@ -1718,6 +1853,41 @@ fn schedule_sync(state: SharedState) {
 
 fn set_data_status(state: &SharedState, text: &str) {
     state.borrow().data_status.set_text_content(Some(text));
+}
+
+async fn delete_current_entry(state: SharedState) -> Result<(), JsValue> {
+    let iso = state.borrow().selected_iso.clone();
+    let Some(window) = web_sys::window() else {
+        return Ok(());
+    };
+
+    let confirmed = window
+        .confirm_with_message(&format!(
+            "Delete the entry for {iso}? This cannot be undone. If sync is on, the deletion syncs to your other devices."
+        ))
+        .unwrap_or(false);
+
+    if !confirmed {
+        return Ok(());
+    }
+
+    finish_inline_edit(state.clone(), true).await?;
+    save_entry(state.clone()).await?;
+    opfs::delete_entry(&iso).await?;
+    queue_sync_delete(&iso);
+
+    {
+        let mut state = state.borrow_mut();
+        state.has_file = false;
+        state.base_text.clear();
+    }
+
+    load_entry(state.clone(), &iso).await?;
+    refresh(state.clone()).await?;
+    set_data_status(&state, "Entry deleted.");
+    schedule_sync(state.clone());
+    close_data(state);
+    Ok(())
 }
 
 async fn export_zip(state: SharedState) -> Result<(), JsValue> {

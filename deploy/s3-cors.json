@@ -1,0 +1,24 @@
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": [
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
+        "https://dainiki.smbl.dev",
+        "http://127.0.0.1:3001"
+      ],
+      "AllowedMethods": [
+        "GET",
+        "PUT",
+        "HEAD"
+      ],
+      "AllowedHeaders": [
+        "*"
+      ],
+      "ExposeHeaders": [
+        "ETag"
+      ],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}

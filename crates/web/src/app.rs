@@ -199,6 +199,18 @@ pub async fn data_overlay() -> Result<impl View> {
                     >
                         "Import a folder"
                     </button>
+                    <div class="border-t border-outline-variant/40 pt-3">
+                        <p class="mb-2 font-ui text-[10px] text-on-surface-variant/60">
+                            "Delete the selected entry. If sync is on, the deletion is encrypted too."
+                        </p>
+                        <button
+                            id="delete-entry"
+                            type="button"
+                            class="w-full rounded border border-secondary/40 px-4 py-2 text-left font-ui text-ui-body text-secondary hover:bg-secondary/5"
+                        >
+                            "Delete selected entry"
+                        </button>
+                    </div>
                     <p
                         id="data-status"
                         class="font-ui text-[10px] text-on-surface-variant/60"

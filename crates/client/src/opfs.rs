@@ -23,6 +23,21 @@ pub async fn read_entry(iso: &str) -> Result<Option<String>, JsValue> {
     Ok(Some(read_file(&file_handle).await?))
 }
 
+pub async fn delete_entry(iso: &str) -> Result<(), JsValue> {
+    let month_dir = match journal_dir(iso, false).await {
+        Ok(dir) => dir,
+        Err(error) if is_not_found(&error) => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    let name = format!("{iso}.md");
+
+    match JsFuture::from(month_dir.remove_entry(&name)).await {
+        Ok(_) => Ok(()),
+        Err(error) if is_not_found(&error) => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 pub async fn write_entry(iso: &str, text: &str) -> Result<(), JsValue> {
     let month_dir = journal_dir(iso, true).await?;
     let file_handle = file_handle(&month_dir, &format!("{iso}.md"), true).await?;

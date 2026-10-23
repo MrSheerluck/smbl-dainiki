@@ -7,6 +7,7 @@ mod health;
 mod layout;
 mod mail;
 mod sync;
+mod sync_storage;
 mod typography;
 
 use topcoat::{
@@ -25,8 +26,10 @@ async fn main() {
         .await
         .expect("could not connect to Postgres; is `docker compose up -d db` running?");
 
+    let storage = sync_storage::SyncStorage::from_env();
     let router = Router::builder()
         .app_context(database)
+        .app_context(storage)
         .cookies()
         .sessions(auth::session_config())
         .layout(layout::root)
@@ -58,7 +61,9 @@ async fn main() {
         .route(sync::get_manifest)
         .route(sync::put_manifest)
         .route(sync::get_entry)
-        .route(sync::put_entry)
+        .route(sync::prepare_entry_upload)
+        .route(sync::commit_entry_upload)
+        .route(sync::delete_entry)
         .route(health::health)
         .route(health::ready)
         .public_dir("web/client")

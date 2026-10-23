@@ -929,6 +929,9 @@ pub async fn delete_account(
         }
     }
 
+    let storage = app_context::<crate::sync_storage::SyncStorage>(cx);
+    crate::sync::purge_user_objects(pool, storage, user.id).await;
+
     audit(cx, pool, Some(user.id), "account_deleted").await;
     sqlx::query("DELETE FROM users WHERE id = $1")
         .bind(user.id)

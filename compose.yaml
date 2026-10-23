@@ -16,6 +16,42 @@ services:
       timeout: 3s
       retries: 20
 
+  rustfs:
+    image: rustfs/rustfs:latest
+    restart: unless-stopped
+    command: server /data --address ":9000" --console-enable --console-address ":9001"
+    environment:
+      RUSTFS_ACCESS_KEY: dainiki
+      RUSTFS_SECRET_KEY: dainiki-minio
+      RUSTFS_REGION: us-east-1
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - dainiki-s3:/data
+      - dainiki-s3-logs:/logs
+
+  storage-init:
+    image: amazon/aws-cli:latest
+    depends_on:
+      - rustfs
+    restart: "no"
+    environment:
+      AWS_ACCESS_KEY_ID: dainiki
+      AWS_SECRET_ACCESS_KEY: dainiki-minio
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until aws --endpoint-url http://rustfs:9000 s3api list-buckets >/dev/null 2>&1; do
+          sleep 1
+        done
+        aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket dainiki-sync
+        aws --endpoint-url http://rustfs:9000 s3api put-bucket-cors --bucket dainiki-sync --cors-configuration file:///tmp/cors.json
+    volumes:
+      - ./deploy/s3-cors.json:/tmp/cors.json:ro
+
   app:
     build: .
     profiles: ["full"]
@@ -23,12 +59,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgres://dainiki:dainiki@db:5432/dainiki
       APP_BASE_URL: http://127.0.0.1:3000
       AUTH_EMAIL_MODE: file
       MAIL_OUTBOX_DIR: /app/data/outbox
       BILLING_MODE: mock
+      SYNC_STORAGE: s3
+      R2_ENDPOINT: http://rustfs:9000
+      R2_PUBLIC_ENDPOINT: http://127.0.0.1:9000
+      R2_ACCESS_KEY_ID: dainiki
+      R2_SECRET_ACCESS_KEY: dainiki-minio
+      R2_BUCKET: dainiki-sync
+      R2_REGION: us-east-1
+      R2_FORCE_PATH_STYLE: "true"
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
@@ -42,4 +88,6 @@ services:
 
 volumes:
   dainiki-postgres:
+  dainiki-s3:
+  dainiki-s3-logs:
   dainiki-outbox:

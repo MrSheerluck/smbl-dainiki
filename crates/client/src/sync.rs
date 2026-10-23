@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct SyncStatus {
     pub active: bool,
     pub linked: bool,
+    pub storage_ready: bool,
     pub usage_bytes: i64,
     pub entry_count: i64,
 }
@@ -21,6 +22,38 @@ struct NewSyncKeys<'a> {
     salt: &'a str,
     wrapped_key: &'a str,
     recovery_wrapped_key: &'a str,
+}
+
+#[derive(Debug, Deserialize)]
+struct ObjectUrl {
+    url: String,
+    revision: i64,
+    hash: String,
+}
+
+#[derive(Debug, Serialize)]
+struct PrepareBody<'a> {
+    entry_id: &'a str,
+    base_revision: i64,
+    size: i64,
+    hash: &'a str,
+}
+
+#[derive(Debug, Deserialize)]
+struct PreparedUpload {
+    upload_id: i64,
+    url: String,
+}
+
+#[derive(Debug, Serialize)]
+struct CommitBody {
+    upload_id: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct DeleteBody<'a> {
+    entry_id: &'a str,
+    base_revision: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -134,11 +167,13 @@ pub async fn fetch_manifest() -> Result<Option<RemoteManifest>, SyncError> {
 
     match response.status() {
         200 => {
-            let headers = response.headers();
-            let revision = header_i64(&headers, "x-sync-revision")?;
-            let bytes = response.binary().await.map_err(network_error)?;
+            let object: ObjectUrl = response.json().await.map_err(network_error)?;
+            let bytes = get_object_bytes(&object.url).await?;
 
-            Ok(Some(RemoteManifest { revision, bytes }))
+            Ok(Some(RemoteManifest {
+                revision: object.revision,
+                bytes,
+            }))
         }
         401 => Err(SyncError::Unauthorized),
         403 => Err(SyncError::Forbidden),
@@ -179,16 +214,12 @@ pub async fn get_entry(entry_id: &str) -> Result<Option<RemoteEntry>, SyncError>
 
     match response.status() {
         200 => {
-            let headers = response.headers();
-            let revision = header_i64(&headers, "x-sync-revision")?;
-            let hash = headers
-                .get("x-sync-hash")
-                .ok_or_else(|| SyncError::Message("Sync response is missing a hash.".to_string()))?;
-            let bytes = response.binary().await.map_err(network_error)?;
+            let object: ObjectUrl = response.json().await.map_err(network_error)?;
+            let bytes = get_object_bytes(&object.url).await?;
 
             Ok(Some(RemoteEntry {
-                revision,
-                hash,
+                revision: object.revision,
+                hash: object.hash,
                 bytes,
             }))
         }
@@ -205,10 +236,45 @@ pub async fn put_entry(
     bytes: Vec<u8>,
     hash: &str,
 ) -> Result<EntryWrite, SyncError> {
-    let response = Request::put(&format!("/api/sync/entry/{entry_id}/{base_revision}"))
+    let size = bytes.len() as i64;
+    let body = PrepareBody {
+        entry_id,
+        base_revision,
+        size,
+        hash,
+    };
+    let response = Request::post("/api/sync/entries/prepare")
+        .json(&body)
+        .map_err(network_error)?
+        .send()
+        .await
+        .map_err(network_error)?;
+
+    let prepared: PreparedUpload = match response.status() {
+        200 => response.json().await.map_err(network_error)?,
+        400 => return Err(SyncError::Conflict),
+        401 => return Err(SyncError::Unauthorized),
+        403 => return Err(SyncError::Forbidden),
+        413 => return Err(SyncError::Quota),
+        _ => return Err(response_error(response).await),
+    };
+
+    let upload = Request::put(&prepared.url)
         .header("content-type", "application/octet-stream")
-        .header("x-sync-hash", hash)
         .body(js_sys::Uint8Array::from(bytes.as_slice()))
+        .map_err(network_error)?
+        .send()
+        .await
+        .map_err(network_error)?;
+
+    if !upload.ok() {
+        return Err(response_error(upload).await);
+    }
+
+    let response = Request::post("/api/sync/entries/commit")
+        .json(&CommitBody {
+            upload_id: prepared.upload_id,
+        })
         .map_err(network_error)?
         .send()
         .await
@@ -224,11 +290,44 @@ pub async fn put_entry(
     }
 }
 
-fn header_i64(headers: &gloo_net::http::Headers, name: &str) -> Result<i64, SyncError> {
-    headers
-        .get(name)
-        .and_then(|value| value.parse().ok())
-        .ok_or_else(|| SyncError::Message(format!("Sync response is missing {name}.")))
+pub async fn delete_entry(
+    entry_id: &str,
+    base_revision: i64,
+) -> Result<EntryWrite, SyncError> {
+    let response = Request::post("/api/sync/entries/delete")
+        .json(&DeleteBody {
+            entry_id,
+            base_revision,
+        })
+        .map_err(network_error)?
+        .send()
+        .await
+        .map_err(network_error)?;
+
+    match response.status() {
+        200 => response.json().await.map_err(network_error),
+        400 => Err(SyncError::Conflict),
+        401 => Err(SyncError::Unauthorized),
+        403 => Err(SyncError::Forbidden),
+        429 => Err(SyncError::Message("Sync is busy. Try again in a minute.".to_string())),
+        _ => Err(response_error(response).await),
+    }
+}
+
+async fn get_object_bytes(url: &str) -> Result<Vec<u8>, SyncError> {
+    let response = Request::get(url)
+        .send()
+        .await
+        .map_err(|error| SyncError::Message(format!("Could not download sync object: {error}")))?;
+
+    if !response.ok() {
+        return Err(response_error(response).await);
+    }
+
+    response
+        .binary()
+        .await
+        .map_err(|error| SyncError::Message(format!("Could not read sync object: {error}")))
 }
 
 async fn response_error(response: gloo_net::http::Response) -> SyncError {

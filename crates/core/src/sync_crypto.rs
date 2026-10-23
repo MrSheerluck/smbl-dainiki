@@ -51,6 +51,8 @@ pub struct ManifestEntry {
     pub hash: String,
     pub size: u64,
     pub revision: i64,
+    #[serde(default)]
+    pub deleted: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -348,6 +350,7 @@ mod tests {
                 hash: content_hash("hello"),
                 size: 5,
                 revision: 3,
+                deleted: false,
             }],
         };
         let encrypted = encrypt_manifest(&keys.master_key, &manifest).unwrap();

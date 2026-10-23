@@ -527,6 +527,18 @@ class DainikiE2E(unittest.TestCase):
             response = self.page.request.get(f"{BASE_URL}{icon['src']}")
             self.assertEqual(response.status, 200, icon["src"])
 
+        head = self.page.content()
+        self.assertIn('property="og:image"', head)
+        for asset in (
+            "/favicon.ico",
+            "/favicon-32x32.png",
+            "/favicon-16x16.png",
+            "/apple-touch-icon.png",
+            "/og.png",
+        ):
+            response = self.page.request.get(f"{BASE_URL}{asset}")
+            self.assertEqual(response.status, 200, asset)
+
         self.page.reload(wait_until="networkidle")
         self.page.wait_for_timeout(900)
         self.page.wait_for_function(

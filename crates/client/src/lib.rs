@@ -100,8 +100,11 @@ struct State {
     history_timeout: Option<Timeout>,
     sync_overlay: Element,
     sync_content: Element,
+    sync_affordance: Element,
     sync_label: Element,
+    sync_offer_title: Element,
     sync_detail: Element,
+    sync_cta: Element,
     sync_status: Option<sync::SyncStatus>,
     sync_signed_out: bool,
     sync_keys: Option<sync::SyncKeys>,
@@ -217,8 +220,11 @@ pub fn start() -> Result<(), JsValue> {
         history_timeout: None,
         sync_overlay: element(&document, "#sync-overlay")?,
         sync_content: element(&document, "#sync-content")?,
+        sync_affordance: element(&document, "#open-sync")?,
         sync_label: element(&document, "#sync-label")?,
+        sync_offer_title: element(&document, "#sync-offer-title")?,
         sync_detail: element(&document, "#sync-detail")?,
+        sync_cta: element(&document, "#sync-cta")?,
         sync_status: None,
         sync_signed_out: false,
         sync_keys: None,
@@ -3017,55 +3023,106 @@ fn key_from_hex(value: &str) -> Option<[u8; 32]> {
 }
 
 fn update_sync_affordance(state: SharedState) {
-    let (label, detail, dot) = {
+    let (label, title, detail, cta, state_name) = {
         let state = state.borrow();
 
         if state.sync_signed_out {
-            ("Local journal", "Sign in to sync".to_string(), "off")
+            (
+                "Dainiki Sync",
+                "Keep your journal on every device.",
+                "End-to-end encrypted. $2/month or $20/year.".to_string(),
+                "Sign in or sign up",
+                "off",
+            )
         } else if let Some(status) = &state.sync_status {
             if state.sync_busy {
-                ("Paid sync", "Syncing…".to_string(), "busy")
+                (
+                    "Syncing",
+                    "Bringing your journal up to date.",
+                    "Encrypted in transit and at rest.".to_string(),
+                    "View sync status",
+                    "busy",
+                )
             } else if !status.active {
                 (
                     "Signed in",
+                    "Put your words on every screen.",
                     format!("No active plan · {}", status.email),
+                    "Choose a plan",
                     "setup",
                 )
             } else if !status.storage_ready {
-                ("Paid sync", "Sync unavailable".to_string(), "off")
+                (
+                    "Paid sync",
+                    "Your local journal is ready.",
+                    "Sync unavailable".to_string(),
+                    "View status",
+                    "off",
+                )
             } else if !status.linked {
                 (
                     "Paid sync",
+                    "One last step.",
                     format!("Finish setup · {}", status.email),
+                    "Finish setup",
                     "setup",
                 )
             } else if state.sync_master_key.is_none() {
                 (
                     "Paid sync",
-                    format!("Connect this device · {}", status.email),
+                    "Connect this device.",
+                    "Connect this device with your passphrase.".to_string(),
+                    "Connect device",
                     "setup",
                 )
             } else if state.sync_missing > 0 {
                 (
                     "Paid sync",
-                    format!("On · {} · {} older", status.email, state.sync_missing),
+                    "Your journal is in sync.",
+                    format!(
+                        "On · {} · {} older",
+                        status.email, state.sync_missing
+                    ),
+                    "Download older entries",
                     "on",
                 )
             } else {
                 (
                     "Paid sync",
+                    "Every device in step.",
                     format!("On · {}", status.email),
+                    "Manage sync",
                     "on",
                 )
             }
         } else {
-            ("Journal", "Checking sync…".to_string(), "off")
+            (
+                "Journal",
+                "Checking this device…",
+                "Checking sync…".to_string(),
+                "View sync",
+                "off",
+            )
         }
     };
 
-    state.borrow().sync_label.set_text_content(Some(label));
-    state.borrow().sync_label.set_attribute("data-sync-state", dot).ok();
-    state.borrow().sync_detail.set_text_content(Some(&detail));
+    let state = state.borrow();
+    state.sync_label.set_text_content(Some(label));
+    state
+        .sync_label
+        .set_attribute("data-sync-state", state_name)
+        .ok();
+    state.sync_offer_title.set_text_content(Some(title));
+    state.sync_detail.set_text_content(Some(&detail));
+    state.sync_cta.set_text_content(Some(cta));
+    state
+        .sync_affordance
+        .set_attribute("data-sync-state", state_name)
+        .ok();
+    state
+        .sync_affordance
+        .set_attribute("aria-label", &format!("{title} {cta}"))
+        .ok();
 }
 
 fn input_value(document: &Document, selector: &str) -> String {

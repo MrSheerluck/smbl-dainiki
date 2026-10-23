@@ -7,10 +7,25 @@ use topcoat::{
     view::{View, view},
 };
 
+const DEFAULT_APP_ORIGIN: &str = "https://app.dainiki.smbl.dev";
+const OG_TITLE: &str = "Dainiki — a quiet place to keep your days.";
+const OG_DESCRIPTION: &str =
+    "A local-first, text-only daily journal. Plain Markdown on your device, with optional end-to-end encrypted sync.";
+
+fn app_origin() -> String {
+    std::env::var("APP_BASE_URL")
+        .unwrap_or_else(|_| DEFAULT_APP_ORIGIN.to_string())
+        .trim_end_matches('/')
+        .to_string()
+}
+
 #[layout("/")]
 pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     let path = uri(cx).path();
     let journal = path == "/";
+    let origin = app_origin();
+    let page_url = format!("{origin}{path}");
+    let og_image = format!("{origin}/og.png");
     let title = match path {
         "/signup" => "Create a sync account · Dainiki",
         "/signin" => "Sign in · Dainiki",
@@ -36,9 +51,49 @@ pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <meta name="theme-color" content="#fef8f6">
+                <meta name="description" content=(OG_DESCRIPTION)>
+                <meta property="og:type" content="website">
+                <meta property="og:url" content=(page_url.clone())>
+                <meta property="og:site_name" content="Dainiki">
+                <meta property="og:title" content=(OG_TITLE)>
+                <meta property="og:description" content=(OG_DESCRIPTION)>
+                <meta property="og:image" content=(og_image.clone())>
+                <meta property="og:image:type" content="image/png">
+                <meta property="og:image:width" content="1200">
+                <meta property="og:image:height" content="630">
+                <meta
+                    property="og:image:alt"
+                    content="Dainiki — a quiet place to keep your days."
+                >
+                <meta name="twitter:card" content="summary_large_image">
+                <meta name="twitter:title" content=(OG_TITLE)>
+                <meta name="twitter:description" content=(OG_DESCRIPTION)>
+                <meta name="twitter:image" content=(og_image.clone())>
+                <meta
+                    name="twitter:image:alt"
+                    content="Dainiki — a quiet place to keep your days."
+                >
                 <title>(title)</title>
+                <link rel="canonical" href=(page_url)>
+                <link rel="icon" href="/favicon.ico" sizes="any">
+                <link
+                    rel="icon"
+                    type="image/png"
+                    sizes="32x32"
+                    href="/favicon-32x32.png"
+                >
+                <link
+                    rel="icon"
+                    type="image/png"
+                    sizes="16x16"
+                    href="/favicon-16x16.png"
+                >
+                <link
+                    rel="apple-touch-icon"
+                    sizes="180x180"
+                    href="/apple-touch-icon.png"
+                >
                 <link rel="manifest" href="/manifest.webmanifest">
-                <link rel="apple-touch-icon" href="/icon-192.png">
                 topcoat::font::link(font: INTER)
                 topcoat::font::link(font: NEWSREADER)
                 <link rel="stylesheet" href=(topcoat::tailwind::stylesheet!())>

@@ -12,7 +12,7 @@ pub async fn timeline() -> Result<impl View> {
             <div
                 id="sidebar-backdrop"
                 hidden="true"
-                class="fixed inset-0 z-30 bg-on-surface/20 backdrop-blur-sm lg:hidden"
+                class="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden"
             ></div>
             <div class="flex min-w-0 flex-1 flex-col lg:min-h-0">
                 topbar()
@@ -52,7 +52,7 @@ pub async fn welcome_overlay() -> Result<impl View> {
             role="dialog"
             aria-modal="true"
             aria-labelledby="welcome-title"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/20 px-4 backdrop-blur-sm"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
         >
             <div class="w-full max-w-md rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-6 shadow-2xl">
                 <p class="font-ui text-[10px] uppercase tracking-[0.16em] text-primary">
@@ -99,7 +99,7 @@ pub async fn data_overlay() -> Result<impl View> {
             role="dialog"
             aria-modal="true"
             aria-label="Import and export"
-            class="fixed inset-0 z-50 flex items-start justify-center bg-on-surface/20 px-4 pt-24 backdrop-blur-sm"
+            class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
         >
             <div class="w-full max-w-md overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl">
                 <div class="flex items-center justify-between border-b border-outline-variant/40 px-5 py-3">
@@ -170,7 +170,7 @@ pub async fn search_overlay() -> Result<impl View> {
             role="dialog"
             aria-modal="true"
             aria-label="Search entries"
-            class="fixed inset-0 z-50 flex items-start justify-center bg-on-surface/20 px-4 pt-24 backdrop-blur-sm"
+            class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
         >
             <div class="w-full max-w-xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl">
                 <input

@@ -215,7 +215,7 @@ fn search_snippet(entry: &EntryRecord, query: &str) -> String {
 
 pub fn inline_editor(text: &str) -> String {
     format!(
-        r#"<div class="mt-4 rounded-lg border border-outline-variant/40 bg-surface-container-low/40 p-4">
+        r#"<div class="rounded-xl border border-outline-variant/40 bg-surface-container-lowest/80 p-5 shadow-sm sm:p-6">
   <textarea aria-label="Edit entry" class="min-h-[10rem] w-full resize-y border-0 bg-transparent font-journal text-journal text-on-surface outline-none" spellcheck="true">{text}</textarea>
   <div class="mt-3 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-2">
     <span aria-live="polite" class="inline-status font-ui text-[10px] text-on-surface-variant/60">Editing</span>
@@ -340,7 +340,7 @@ pub fn calendar(
         );
 
         if is_future {
-            class.push_str(" cursor-default text-on-surface-variant/25");
+            class.push_str(" cursor-default text-on-surface-variant/35");
         } else if is_selected {
             class.push_str(" bg-primary text-on-primary hover:bg-primary");
         } else {

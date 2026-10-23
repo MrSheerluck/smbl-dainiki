@@ -376,7 +376,7 @@ pub async fn billing_portal(cx: &Cx, Form(input): Form<PortalForm>) -> Result<im
 
 #[route(POST "/api/billing/webhook")]
 pub async fn billing_webhook(cx: &Cx, body: Bytes) -> Result<&'static str> {
-    if std::env::var("DODO_PAYMENTS_WEBHOOK_KEY").is_err() {
+    if dodo::webhook_key().is_none() {
         return Err(service_unavailable(60).into());
     }
 

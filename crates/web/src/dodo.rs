@@ -59,12 +59,25 @@ pub fn mode() -> BillingMode {
 }
 
 pub fn config() -> Option<Config> {
-    let api_key = env::var("DODO_PAYMENTS_API_KEY").ok()?;
-    let monthly_product_id = env::var("DODO_MONTHLY_PRODUCT_ID").ok()?;
-    let yearly_product_id = env::var("DODO_YEARLY_PRODUCT_ID").ok()?;
+    let live = is_live_mode();
+    let api_key = env_for_mode(
+        "DODO_PAYMENTS_API_KEY",
+        "DODO_LIVE_API_KEY",
+        live,
+    )?;
+    let monthly_product_id = env_for_mode(
+        "DODO_MONTHLY_PRODUCT_ID",
+        "DODO_LIVE_MONTHLY_PRODUCT_ID",
+        live,
+    )?;
+    let yearly_product_id = env_for_mode(
+        "DODO_YEARLY_PRODUCT_ID",
+        "DODO_LIVE_YEARLY_PRODUCT_ID",
+        live,
+    )?;
 
     let api_base = env::var("DODO_PAYMENTS_API_BASE_URL").unwrap_or_else(|_| {
-        if env::var("DODO_PAYMENTS_ENVIRONMENT").as_deref() == Ok("live_mode") {
+        if live {
             LIVE_API_BASE.to_string()
         } else {
             TEST_API_BASE.to_string()
@@ -77,6 +90,28 @@ pub fn config() -> Option<Config> {
         monthly_product_id,
         yearly_product_id,
     })
+}
+
+pub fn webhook_key() -> Option<String> {
+    env_for_mode(
+        "DODO_PAYMENTS_WEBHOOK_KEY",
+        "DODO_LIVE_WEBHOOK_KEY",
+        is_live_mode(),
+    )
+}
+
+fn is_live_mode() -> bool {
+    env::var("DODO_PAYMENTS_ENVIRONMENT").as_deref() == Ok("live_mode")
+}
+
+fn env_for_mode(test_name: &str, live_name: &str, live: bool) -> Option<String> {
+    if live {
+        env::var(live_name)
+            .ok()
+            .or_else(|| env::var(test_name).ok())
+    } else {
+        env::var(test_name).ok()
+    }
 }
 
 pub fn product_id<'a>(config: &'a Config, plan: &str) -> &'a str {
@@ -211,10 +246,10 @@ pub fn verify_webhook(
     webhook_signature: &str,
     body: &[u8],
 ) -> Result<bool> {
-    let secret = env::var("DODO_PAYMENTS_WEBHOOK_KEY").map_err(|_| {
+    let secret = webhook_key().ok_or_else(|| {
         IoError::new(
             ErrorKind::NotFound,
-            "DODO_PAYMENTS_WEBHOOK_KEY is not configured",
+            "the Dodo webhook signing key is not configured",
         )
     })?;
 

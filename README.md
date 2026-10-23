@@ -71,6 +71,22 @@ Create two recurring products in Dodo (monthly $2, yearly $20), then point the
 webhook endpoint at `/api/billing/webhook` and subscribe it to the
 `subscription.*` events. Dodo is the merchant of record and handles tax.
 
+The Dodo CLI can create and manage products, open checkout sessions, and
+forward test webhooks to localhost:
+
+```sh
+curl -fsSL https://dodopayments.com/install.sh | sh
+~/.local/bin/dodo login "$DODO_PAYMENTS_API_KEY" test
+~/.local/bin/dodo products list 1
+~/.local/bin/dodo wh listen http://127.0.0.1:3000/api/billing/webhook
+```
+
+For the live setup, log in with a live key and fill the `DODO_LIVE_*` values.
+The app automatically switches to them when
+`DODO_PAYMENTS_ENVIRONMENT=live_mode`; otherwise it uses the test values.
+The live webhook URL must be the deployed app's public
+`/api/billing/webhook` endpoint.
+
 Run the browser suites with the server running:
 
 ```sh

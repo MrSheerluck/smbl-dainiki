@@ -414,6 +414,11 @@ class DainikiE2E(unittest.TestCase):
         self.assertIn("Imported", self.page.locator("#data-status").inner_text())
         self.assertIn("Today export.", self.page.locator("#entry-editor").inner_text())
         self.assertGreaterEqual(self.page.locator("#timeline-entries article").count(), 1)
+        self.assertTrue(
+            any(".conflict-123.md" in name for name in self.list_files()),
+            self.list_files(),
+        )
+        self.assertTrue(self.page.locator("#open-conflicts").is_visible())
 
     def test_offline_shell(self):
         self.page.reload(wait_until="networkidle")

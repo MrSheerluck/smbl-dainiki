@@ -1304,6 +1304,14 @@ fn render_archive(state: SharedState) {
     state.borrow().archive_content.set_inner_html(&html);
 }
 
+async fn refresh_conflicts_only(state: SharedState) -> Result<(), JsValue> {
+    let conflicts = opfs::list_conflicts().await?;
+    state.borrow_mut().conflicts = conflicts;
+    render_conflict_indicator(state.clone());
+    render_conflict_panel(state);
+    Ok(())
+}
+
 fn render_conflict_indicator(state: SharedState) {
     let count = state.borrow().conflicts.len();
     let (indicator, count_label) = {
@@ -2851,6 +2859,7 @@ async fn import_files(state: SharedState, input: HtmlInputElement) -> Result<(),
 
     let mut imported = 0;
     let mut conflicts = 0;
+    let mut restored_conflicts = 0;
     let mut skipped = 0;
 
     for index in 0..files.length() {
@@ -2863,17 +2872,25 @@ async fn import_files(state: SharedState, input: HtmlInputElement) -> Result<(),
 
         if lower.ends_with(".zip") {
             let bytes = read_file_bytes(&file).await?;
-            let (zip_imported, zip_conflicts, zip_skipped) = import_zip(bytes).await?;
+            let (zip_imported, zip_conflicts, zip_restored, zip_skipped) =
+                import_zip(bytes).await?;
             imported += zip_imported;
             conflicts += zip_conflicts;
+            restored_conflicts += zip_restored;
             skipped += zip_skipped;
         } else if lower.ends_with(".md") {
+            let text = read_file_text(&file).await?;
+
+            if let Some((iso, conflict_stem)) = conflict_from_stem(&name) {
+                opfs::write_conflict_named(iso, conflict_stem, &text).await?;
+                restored_conflicts += 1;
+                continue;
+            }
+
             let Some(iso) = date_from_stem(&name) else {
                 skipped += 1;
                 continue;
             };
-
-            let text = read_file_text(&file).await?;
 
             match import_markdown(&iso, &text).await? {
                 ImportOutcome::Imported => imported += 1,
@@ -2891,15 +2908,18 @@ async fn import_files(state: SharedState, input: HtmlInputElement) -> Result<(),
     refresh(state.clone()).await?;
     set_data_status(
         &state,
-        &format!("Imported {imported}, conflicts {conflicts}, skipped {skipped}."),
+        &format!(
+            "Imported {imported}, conflicts {conflicts}, restored conflicts {restored_conflicts}, skipped {skipped}."
+        ),
     );
     Ok(())
 }
 
-async fn import_zip(bytes: Vec<u8>) -> Result<(usize, usize, usize), JsValue> {
+async fn import_zip(bytes: Vec<u8>) -> Result<(usize, usize, usize, usize), JsValue> {
     let mut archive = ZipArchive::new(Cursor::new(bytes)).map_err(zip_error)?;
     let mut imported = 0;
     let mut conflicts = 0;
+    let mut restored_conflicts = 0;
     let mut skipped = 0;
 
     for index in 0..archive.len() {
@@ -2912,13 +2932,19 @@ async fn import_zip(bytes: Vec<u8>) -> Result<(usize, usize, usize), JsValue> {
         }
 
         let stem = name.rsplit('/').next().unwrap_or(&name);
+        let mut text = String::new();
+        file.read_to_string(&mut text).map_err(io_error)?;
+
+        if let Some((iso, conflict_stem)) = conflict_from_stem(stem) {
+            opfs::write_conflict_named(iso, conflict_stem, &text).await?;
+            restored_conflicts += 1;
+            continue;
+        }
+
         let Some(iso) = date_from_stem(stem) else {
             skipped += 1;
             continue;
         };
-
-        let mut text = String::new();
-        file.read_to_string(&mut text).map_err(io_error)?;
 
         match import_markdown(&iso, &text).await? {
             ImportOutcome::Imported => imported += 1,
@@ -2927,7 +2953,7 @@ async fn import_zip(bytes: Vec<u8>) -> Result<(usize, usize, usize), JsValue> {
         }
     }
 
-    Ok((imported, conflicts, skipped))
+    Ok((imported, conflicts, restored_conflicts, skipped))
 }
 
 async fn import_markdown(iso: &str, text: &str) -> Result<ImportOutcome, JsValue> {
@@ -2952,6 +2978,21 @@ async fn read_file_text(file: &File) -> Result<String, JsValue> {
 async fn read_file_bytes(file: &File) -> Result<Vec<u8>, JsValue> {
     let buffer = JsFuture::from(file.array_buffer()).await?;
     Ok(Uint8Array::new(&buffer).to_vec())
+}
+
+fn conflict_from_stem(stem: &str) -> Option<(&str, &str)> {
+    let name = stem;
+    let stem = stem.strip_suffix(".md")?;
+    let (iso, suffix) = stem.split_once(".conflict-")?;
+
+    if parse_date(iso).is_none()
+        || suffix.is_empty()
+        || !suffix.chars().all(|ch| ch.is_ascii_digit())
+    {
+        return None;
+    }
+
+    Some((iso, name))
 }
 
 fn date_from_stem(stem: &str) -> Option<String> {
@@ -3758,16 +3799,9 @@ async fn refresh(state: SharedState) -> Result<(), JsValue> {
             borrowed.entries = entries;
             drop(borrowed);
 
-            let conflicts = match opfs::list_conflicts().await {
-                Ok(conflicts) => conflicts,
-                Err(error) => {
-                    web_sys::console::error_1(&error);
-                    Vec::new()
-                }
-            };
-            state.borrow_mut().conflicts = conflicts;
-            render_conflict_indicator(state.clone());
-            render_conflict_panel(state.clone());
+            if let Err(error) = refresh_conflicts_only(state.clone()).await {
+                web_sys::console::error_1(&error);
+            }
             render_ui(state.clone());
         }
         Err(error) => {
@@ -4107,6 +4141,7 @@ async fn save_inline(state: SharedState) -> Result<bool, JsValue> {
                         state.inline_redo_stack.clear();
                     }
                     set_inline_status(status.as_ref(), &format!("Conflict copy saved as {name}"));
+                    let _ = refresh_conflicts_only(state.clone()).await;
                     true
                 }
                 Err(error) => {
@@ -4138,6 +4173,7 @@ async fn save_inline(state: SharedState) -> Result<bool, JsValue> {
                         status.as_ref(),
                         &format!("Conflict copy saved as {name} — entry was deleted"),
                     );
+                    let _ = refresh_conflicts_only(state.clone()).await;
                     true
                 }
                 Err(error) => {

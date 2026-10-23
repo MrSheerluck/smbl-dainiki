@@ -144,6 +144,26 @@ pub async fn list_entries() -> Result<Vec<(String, String)>, JsValue> {
     Ok(entries)
 }
 
+pub async fn write_conflict_named(iso: &str, name: &str, text: &str) -> Result<(), JsValue> {
+    let prefix = format!("{iso}.conflict-");
+    let Some(stamp) = name.strip_prefix(&prefix).and_then(|rest| rest.strip_suffix(".md")) else {
+        return Err(JsValue::from_str("invalid conflict copy name"));
+    };
+    if stamp.is_empty() || !stamp.chars().all(|ch| ch.is_ascii_digit()) {
+        return Err(JsValue::from_str("invalid conflict copy name"));
+    }
+
+    let month_dir = journal_dir(iso, true).await?;
+    let file_handle = file_handle(&month_dir, name, true).await?;
+    let writable: FileSystemWritableFileStream = JsFuture::from(file_handle.create_writable())
+        .await?
+        .dyn_into()?;
+
+    JsFuture::from(writable.write_with_str(text)?).await?;
+    JsFuture::from(writable.close()).await?;
+    Ok(())
+}
+
 pub async fn list_conflicts() -> Result<Vec<ConflictCopy>, JsValue> {
     let root = storage_root().await?;
     let journal = match directory(&root, "journal", false).await {

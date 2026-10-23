@@ -190,8 +190,10 @@ S3-compatible object storage. Presigned URLs keep entry bytes off the app
 server, and R2 object keys use opaque HMAC-derived ids rather than dates. The
 client syncs recent entries first (30 by default), supports an explicit
 “Download all entries” action, detects conflicts with base hashes and
-writes local `.conflict-<timestamp>.md` copies, and propagates encrypted entry
-deletions as tombstones. Paid devices remember the sync key after the first passphrase setup or unlock, so sync stays on automatically; **Forget this device** removes the local key. The full suite has 30 browser tests.
+writes local `.conflict-<timestamp>.md` copies that can be reviewed, restored,
+downloaded, or deleted in the app, and propagates encrypted entry deletions as
+tombstones. An optional diff3 mode automatically merges non-overlapping edits;
+overlapping edits still become conflict copies. Paid devices remember the sync key after the first passphrase setup or unlock, so sync stays on automatically; **Forget this device** removes the local key. The full suite has 31 browser tests.
 
 Local billing runs in mock mode by default. Real checkout uses Dodo test or live
 mode with two subscription products and a webhook endpoint. No free trial; the

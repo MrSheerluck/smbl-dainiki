@@ -6,6 +6,8 @@ use std::{
 use dainiki_core::{Date, EntryMeta, month_short, month_year, parse_date, weekday_name};
 use time::Month;
 
+use crate::opfs::ConflictCopy;
+
 #[derive(Clone)]
 pub struct EntryRecord {
     pub iso: String,
@@ -369,6 +371,128 @@ pub fn calendar(
     html.push_str("</div>");
 
     html
+}
+
+pub fn conflict_panel(conflicts: &[ConflictCopy], entries: &[EntryRecord]) -> String {
+    if conflicts.is_empty() {
+        return r#"<div class="py-10 text-center">
+  <p class="font-display text-lg text-on-surface">No conflict copies.</p>
+  <p class="mt-1 font-ui text-ui-label text-on-surface-variant/60">There is nothing to review right now.</p>
+</div>"#
+            .to_string();
+    }
+
+    let mut grouped: BTreeMap<&str, Vec<&ConflictCopy>> = BTreeMap::new();
+    for conflict in conflicts {
+        grouped.entry(conflict.iso.as_str()).or_default().push(conflict);
+    }
+
+    let current: BTreeMap<&str, &str> = entries
+        .iter()
+        .map(|entry| (entry.iso.as_str(), entry.text.as_str()))
+        .collect();
+
+    let mut html = String::from(r#"<div class="space-y-5">"#);
+
+    for (iso, copies) in grouped.into_iter().rev() {
+        let date_label = parse_date(iso).map_or_else(
+            || iso.to_string(),
+            |date| {
+                format!(
+                    "{}, {} {}, {}",
+                    weekday_name(date),
+                    month_short(date),
+                    date.day(),
+                    date.year()
+                )
+            },
+        );
+        let current_text = current.get(iso).copied();
+        let count_label = if copies.len() == 1 {
+            "1 copy".to_string()
+        } else {
+            format!("{} copies", copies.len())
+        };
+
+        let _ = write!(
+            html,
+            r#"<section>
+  <div class="mb-2 flex items-baseline justify-between gap-3">
+    <h3 class="font-display text-lg text-on-surface">{date_label}</h3>
+    <span class="font-ui text-[10px] text-on-surface-variant/50">{count_label}</span>
+  </div>
+  <div class="space-y-2">"#
+        );
+
+        for (index, conflict) in copies.iter().enumerate() {
+            let time = conflict_time(conflict.timestamp);
+            let open = if index == 0 { " open" } else { "" };
+            let current_body = current_text.map_or_else(
+                || {
+                    r#"<p class="py-3 font-ui text-ui-label text-on-surface-variant/50">No current entry. Choosing this copy will restore it.</p>"#.to_string()
+                },
+                |text| {
+                    format!(
+                        r#"<div class="live-editor max-h-64 overflow-y-auto rounded bg-surface-container-low/60 p-3 text-[0.95rem]">{}</div>"#,
+                        crate::markdown::render_document_html(text)
+                    )
+                },
+            );
+            let conflict_body = format!(
+                r#"<div class="live-editor max-h-64 overflow-y-auto rounded bg-surface-container-low/60 p-3 text-[0.95rem]">{}</div>"#,
+                crate::markdown::render_document_html(&conflict.text)
+            );
+            let line_count = conflict.text.lines().count();
+            let count = if line_count == 1 {
+                "1 line".to_string()
+            } else {
+                format!("{line_count} lines")
+            };
+
+            let _ = write!(
+                html,
+                r#"<details class="group rounded-xl border border-outline-variant/40 bg-surface-container-lowest/70"{open}>
+  <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+    <span class="flex items-center gap-2 font-ui text-ui-label text-on-surface">
+      <span class="text-secondary">◐</span>
+      <span>Conflict copy · {time}</span>
+    </span>
+    <span class="font-ui text-[10px] text-on-surface-variant/50">{count}</span>
+  </summary>
+  <div class="border-t border-outline-variant/30 p-3">
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div>
+        <p class="mb-1 font-ui text-[9px] font-semibold uppercase tracking-[0.14em] text-secondary">Conflict version</p>
+        {conflict_body}
+      </div>
+      <div>
+        <p class="mb-1 font-ui text-[9px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant/60">Current entry</p>
+        {current_body}
+      </div>
+    </div>
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <button type="button" data-conflict-action="use" data-conflict-name="{name}" data-conflict-iso="{iso}" class="rounded bg-primary px-3 py-1.5 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">Use this version</button>
+      <button type="button" data-conflict-action="open" data-conflict-name="{name}" data-conflict-iso="{iso}" class="rounded border border-outline-variant/60 px-3 py-1.5 font-ui text-ui-label text-on-surface hover:bg-surface-container">Open entry</button>
+      <button type="button" data-conflict-action="download" data-conflict-name="{name}" data-conflict-iso="{iso}" class="rounded border border-outline-variant/60 px-3 py-1.5 font-ui text-ui-label text-on-surface-variant hover:bg-surface-container hover:text-on-surface">Download .md</button>
+      <button type="button" data-conflict-action="delete" data-conflict-name="{name}" data-conflict-iso="{iso}" class="ml-auto rounded px-2 py-1.5 font-ui text-ui-label text-on-surface-variant/60 hover:text-secondary">Delete copy</button>
+    </div>
+  </div>
+</details>"#,
+                name = escape_html(&conflict.name),
+                iso = escape_html(&conflict.iso),
+            );
+        }
+
+        html.push_str("</div></section>");
+    }
+
+    html.push_str("</div>");
+    html
+}
+
+fn conflict_time(timestamp: u64) -> String {
+    let date = js_sys::Date::new(&wasm_bindgen::JsValue::from_f64(timestamp as f64));
+    format!("{:02}:{:02}", date.get_hours(), date.get_minutes())
 }
 
 pub fn archive(

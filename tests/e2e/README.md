@@ -67,6 +67,7 @@ Encrypted sync (`test_sync.py`):
 - sync requires an active plan
 - passphrase setup, two-device download, auto-connect after reload, Forget this device
 - conflict copies with the remote version canonical
+- conflict review panel and optional diff3 auto-merge
 - encrypted deletion/tombstone propagation
 - recent-first download (30 entries) and explicit Download all
 

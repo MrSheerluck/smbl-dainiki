@@ -65,6 +65,12 @@ struct State {
     archive_content: Element,
     archive_year: i32,
     archive_month: u32,
+    conflicts: Vec<opfs::ConflictCopy>,
+    conflict_overlay: Element,
+    conflict_content: Element,
+    conflict_indicator: Element,
+    conflict_count: Element,
+    conflict_status: Element,
     import_file: HtmlInputElement,
     import_folder: HtmlInputElement,
     inline_iso: Option<String>,
@@ -105,6 +111,7 @@ struct State {
     sync_auto_timeout: Option<Timeout>,
     sync_missing: usize,
     sync_download_all: bool,
+    sync_auto_merge: bool,
 }
 
 type SharedState = Rc<RefCell<State>>;
@@ -173,6 +180,12 @@ pub fn start() -> Result<(), JsValue> {
         archive_content: element(&document, "#archive-content")?,
         archive_year: calendar_year,
         archive_month: calendar_month,
+        conflicts: Vec::new(),
+        conflict_overlay: element(&document, "#conflict-overlay")?,
+        conflict_content: element(&document, "#conflict-content")?,
+        conflict_indicator: element(&document, "#open-conflicts")?,
+        conflict_count: element(&document, "#conflict-count")?,
+        conflict_status: element(&document, "#conflict-status")?,
         import_file: query::<HtmlInputElement>(&document, "#import-file")?,
         import_folder: query::<HtmlInputElement>(&document, "#import-folder-input")?,
         inline_iso: None,
@@ -213,6 +226,10 @@ pub fn start() -> Result<(), JsValue> {
         sync_auto_timeout: None,
         sync_missing: 0,
         sync_download_all: false,
+        sync_auto_merge: local_storage()
+            .and_then(|storage| storage.get_item("dainiki-sync-auto-merge").ok().flatten())
+            .as_deref()
+            == Some("true"),
     }));
 
     init_theme(&document)?;
@@ -808,6 +825,62 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
+    let open_conflicts_state = state.clone();
+    listen(
+        element(document, "#open-conflicts")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            open_conflicts(open_conflicts_state.clone());
+        }),
+    )?;
+
+    let close_conflicts_state = state.clone();
+    listen(
+        element(document, "#close-conflicts")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            close_conflicts(close_conflicts_state.clone());
+        }),
+    )?;
+
+    let conflicts_backdrop_state = state.clone();
+    listen(
+        state.borrow().conflict_overlay.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            let Some(target) = target_element(&event) else {
+                return;
+            };
+            if target.id() == "conflict-overlay" {
+                close_conflicts(conflicts_backdrop_state.clone());
+            }
+        }),
+    )?;
+
+    let conflicts_action_state = state.clone();
+    listen(
+        state.borrow().conflict_content.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_conflict_click(conflicts_action_state.clone(), event);
+        }),
+    )?;
+
+    let conflicts_key_state = state.clone();
+    listen(
+        state.borrow().conflict_overlay.as_ref(),
+        "keydown",
+        Closure::<dyn FnMut(Event)>::new(move |event: Event| {
+            let Ok(event) = event.dyn_into::<KeyboardEvent>() else {
+                return;
+            };
+            if event.key() == "Escape" {
+                event.prevent_default();
+                close_conflicts(conflicts_key_state.clone());
+            }
+        }),
+    )?;
+
     let open_archive_state = state.clone();
     listen(
         element(document, "#open-archive")?.as_ref(),
@@ -1231,6 +1304,172 @@ fn render_archive(state: SharedState) {
     state.borrow().archive_content.set_inner_html(&html);
 }
 
+fn render_conflict_indicator(state: SharedState) {
+    let count = state.borrow().conflicts.len();
+    let (indicator, count_label) = {
+        let state = state.borrow();
+        (state.conflict_indicator.clone(), state.conflict_count.clone())
+    };
+
+    if count == 0 {
+        indicator.set_attribute("hidden", "true").ok();
+    } else {
+        indicator.remove_attribute("hidden").ok();
+    }
+    count_label.set_text_content(Some(&count.to_string()));
+}
+
+fn render_conflict_panel(state: SharedState) {
+    let html = {
+        let state = state.borrow();
+        render::conflict_panel(&state.conflicts, &state.entries)
+    };
+    state.borrow().conflict_content.set_inner_html(&html);
+}
+
+fn open_conflicts(state: SharedState) {
+    set_conflict_status(&state, "");
+    render_conflict_panel(state.clone());
+    state
+        .borrow()
+        .conflict_overlay
+        .remove_attribute("hidden")
+        .ok();
+
+    if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+        if let Ok(Some(button)) = document.query_selector("#close-conflicts") {
+            if let Ok(button) = button.dyn_into::<HtmlElement>() {
+                button.focus().ok();
+            }
+        }
+    }
+}
+
+fn close_conflicts(state: SharedState) {
+    state
+        .borrow()
+        .conflict_overlay
+        .set_attribute("hidden", "true")
+        .ok();
+
+    let indicator_visible = !state
+        .borrow()
+        .conflict_indicator
+        .has_attribute("hidden");
+    let selector = if indicator_visible {
+        "#open-conflicts"
+    } else {
+        "#open-sync"
+    };
+
+    if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+        if let Ok(Some(button)) = document.query_selector(selector) {
+            if let Ok(button) = button.dyn_into::<HtmlElement>() {
+                button.focus().ok();
+            }
+        }
+    }
+}
+
+fn set_conflict_status(state: &SharedState, text: &str) {
+    state
+        .borrow()
+        .conflict_status
+        .set_text_content(Some(text));
+}
+
+fn handle_conflict_click(state: SharedState, event: Event) {
+    let Some(target) = target_element(&event) else {
+        return;
+    };
+    let Ok(Some(button)) = target.closest("[data-conflict-action]") else {
+        return;
+    };
+    let Some(action) = button.get_attribute("data-conflict-action") else {
+        return;
+    };
+    let Some(name) = button.get_attribute("data-conflict-name") else {
+        return;
+    };
+    let Some(iso) = button.get_attribute("data-conflict-iso") else {
+        return;
+    };
+
+    let Some(conflict) = state
+        .borrow()
+        .conflicts
+        .iter()
+        .find(|conflict| conflict.name == name && conflict.iso == iso)
+        .cloned()
+    else {
+        set_conflict_status(&state, "That conflict copy is no longer available.");
+        return;
+    };
+
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+
+    match action.as_str() {
+        "use" => {
+            let confirmed = window
+                .confirm_with_message(
+                    "Replace the current entry with this conflict copy? The conflict copy will be removed.",
+                )
+                .unwrap_or(false);
+            if !confirmed {
+                return;
+            }
+
+            let next_state = state.clone();
+            spawn_result(async move {
+                opfs::write_entry(&iso, &conflict.text).await?;
+                opfs::delete_conflict(&iso, &name).await?;
+                refresh(next_state.clone()).await?;
+                if next_state.borrow().selected_iso == iso {
+                    load_entry(next_state.clone(), &iso).await?;
+                }
+                schedule_sync(next_state.clone());
+                set_conflict_status(&next_state, "Current entry replaced. Conflict copy removed.");
+                Ok(())
+            });
+        }
+        "download" => {
+            if let Some(document) = conflict_content_document(&state) {
+                if let Err(error) = download_bytes(&document, conflict.text.as_bytes(), &name) {
+                    web_sys::console::error_1(&error);
+                    set_conflict_status(&state, "Could not download the conflict copy.");
+                }
+            }
+        }
+        "delete" => {
+            let confirmed = window
+                .confirm_with_message("Delete this conflict copy? This cannot be undone.")
+                .unwrap_or(false);
+            if !confirmed {
+                return;
+            }
+
+            let next_state = state.clone();
+            spawn_result(async move {
+                opfs::delete_conflict(&iso, &name).await?;
+                refresh(next_state.clone()).await?;
+                set_conflict_status(&next_state, "Conflict copy deleted.");
+                Ok(())
+            });
+        }
+        "open" => {
+            close_conflicts(state.clone());
+            spawn_result(select_date(state, iso));
+        }
+        _ => {}
+    }
+}
+
+fn conflict_content_document(state: &SharedState) -> Option<Document> {
+    state.borrow().conflict_content.owner_document()
+}
+
 fn handle_archive_click(state: SharedState, event: Event) {
     let Some(target) = target_element(&event) else {
         return;
@@ -1407,6 +1646,24 @@ fn handle_sync_action(state: SharedState, document: &Document, event: Event) {
             spawn_result(unlock_recovery_sync(state, recovery));
         }
         "sync-now" => spawn_result(run_sync(state)),
+        "auto-merge" => {
+            let enabled = target
+                .closest("input")
+                .ok()
+                .flatten()
+                .and_then(|input| input.dyn_into::<HtmlInputElement>().ok())
+                .is_some_and(|input| input.checked());
+            state.borrow_mut().sync_auto_merge = enabled;
+            if let Some(storage) = local_storage() {
+                storage
+                    .set_item(
+                        "dainiki-sync-auto-merge",
+                        if enabled { "true" } else { "false" },
+                    )
+                    .ok();
+            }
+            render_sync_panel(state);
+        }
         "sync-all" => {
             state.borrow_mut().sync_download_all = true;
             spawn_result(run_sync(state));
@@ -1701,6 +1958,8 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
     let mut downloaded = 0usize;
     let mut conflicts = 0usize;
     let mut deleted = 0usize;
+    let mut auto_merged = 0usize;
+    let auto_merge = state.borrow().sync_auto_merge;
 
     let tombstones: Vec<ManifestEntry> = manifest_entries
         .values()
@@ -1735,6 +1994,10 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
                 .map_err(js_message)?;
             deleted += 1;
         }
+
+        opfs::delete_base(&tombstone.date)
+            .await
+            .map_err(js_message)?;
     }
 
     let pending_deletions = load_sync_deletions();
@@ -1767,6 +2030,7 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
                     },
                 );
                 local.remove(iso);
+                opfs::delete_base(iso).await.map_err(js_message)?;
                 deleted += 1;
             }
             Err(sync::SyncError::Conflict) => {
@@ -1845,6 +2109,7 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
                                 deleted: false,
                             },
                         );
+                        opfs::write_base(&iso, &text).await.map_err(js_message)?;
                         uploaded += 1;
                     }
                     Err(sync::SyncError::Conflict) => {
@@ -1862,6 +2127,9 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
                     Err(error) => return Err(error.message()),
                 }
             }
+            "keep" => {
+                opfs::write_base(&iso, &text).await.map_err(js_message)?;
+            }
             "download" => {
                 let sync_id = remote_entry
                     .as_ref()
@@ -1871,15 +2139,70 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
                 downloaded += 1;
             }
             "conflict" => {
-                let conflict = opfs::write_conflict(&iso, &text)
-                    .await
-                    .map_err(js_message)?;
-                let _ = conflict;
-                conflicts += 1;
                 let sync_id = remote_entry
                     .as_ref()
                     .map(|entry| entry.sync_id.clone())
                     .unwrap_or_else(|| sync_entry_id(&key, &iso));
+
+                if auto_merge {
+                    if let Some(entry) = remote_entry.as_ref() {
+                        if let Some(base_text) = opfs::read_base(&iso).await.map_err(js_message)? {
+                            if let Some(remote) = sync::get_entry(&sync_id)
+                                .await
+                                .map_err(|error| error.message())?
+                            {
+                                let remote_text = decrypt_entry(&key, &iso, &remote.bytes)
+                                    .map_err(|error| error.to_string())?;
+
+                                if let Ok(merged) = diffy::merge(&base_text, &text, &remote_text) {
+                                    let merged_hash = content_hash(&merged);
+                                    let encrypted = encrypt_entry(&key, &iso, &merged)
+                                        .map_err(|error| error.to_string())?;
+
+                                    match sync::put_entry(
+                                        &sync_id,
+                                        entry.revision,
+                                        encrypted,
+                                        &merged_hash,
+                                    )
+                                    .await
+                                    {
+                                        Ok(write) => {
+                                            opfs::write_entry(&iso, &merged)
+                                                .await
+                                                .map_err(js_message)?;
+                                            opfs::write_base(&iso, &merged)
+                                                .await
+                                                .map_err(js_message)?;
+                                            local.insert(iso.clone(), merged);
+                                            manifest_entries.insert(
+                                                iso.clone(),
+                                                ManifestEntry {
+                                                    date: iso.clone(),
+                                                    sync_id,
+                                                    hash: write.hash,
+                                                    size: write.size as u64,
+                                                    revision: write.revision,
+                                                    deleted: false,
+                                                },
+                                            );
+                                            uploaded += 1;
+                                            auto_merged += 1;
+                                            continue;
+                                        }
+                                        Err(sync::SyncError::Conflict) => {}
+                                        Err(error) => return Err(error.message()),
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                opfs::write_conflict(&iso, &text)
+                    .await
+                    .map_err(js_message)?;
+                conflicts += 1;
                 download_entry(&key, &iso, &sync_id, &mut local, &mut manifest_entries).await?;
                 downloaded += 1;
             }
@@ -1971,6 +2294,9 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
     }
 
     let mut message = format!("Synced {uploaded} up, {downloaded} down.");
+    if auto_merged > 0 {
+        message.push_str(&format!(" {auto_merged} auto-merged."));
+    }
     if deleted > 0 {
         message.push_str(&format!(" {deleted} deleted."));
     }
@@ -2022,6 +2348,7 @@ async fn download_entry(
     };
     let text = decrypt_entry(key, iso, &remote.bytes).map_err(|error| error.to_string())?;
     opfs::write_entry(iso, &text).await.map_err(js_message)?;
+    opfs::write_base(iso, &text).await.map_err(js_message)?;
     local.insert(iso.to_string(), text);
 
     if let Some(entry) = manifest_entries.get_mut(iso) {
@@ -2179,6 +2506,14 @@ fn sync_panel_html(state: &State) -> String {
                 escape_sync(recovery)
             ));
         }
+
+        let auto_merge_checked = if state.sync_auto_merge { " checked" } else { "" };
+        html.push_str(&format!(
+            r#"<label class="mt-4 flex items-start gap-2 rounded border border-outline-variant/40 bg-surface-container-low/50 px-3 py-2 font-ui text-ui-label text-on-surface-variant">
+<input id="sync-auto-merge" type="checkbox" data-sync-action="auto-merge" class="mt-0.5 accent-primary"{auto_merge_checked}>
+<span><span class="block text-on-surface">Automatically merge clean conflicts</span><span class="mt-0.5 block text-[10px] leading-4 text-on-surface-variant/60">Non-overlapping edits are combined. Overlapping edits still create a conflict copy.</span></span>
+</label>"#
+        ));
 
         html.push_str(
             r#"<div class="mt-5 flex flex-wrap gap-2">
@@ -2458,7 +2793,9 @@ async fn export_zip(state: SharedState) -> Result<(), JsValue> {
     set_data_status(&state, "Preparing export…");
 
     let entries = opfs::list_entries().await?;
+    let conflicts = opfs::list_conflicts().await?;
     let count = entries.len();
+    let conflict_count = conflicts.len();
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
 
@@ -2468,12 +2805,25 @@ async fn export_zip(state: SharedState) -> Result<(), JsValue> {
         writer.write_all(text.as_bytes()).map_err(io_error)?;
     }
 
+    for conflict in conflicts {
+        let path = format!(
+            "{}/{}/{}",
+            &conflict.iso[0..4],
+            &conflict.iso[5..7],
+            conflict.name
+        );
+        writer.start_file(path, options).map_err(zip_error)?;
+        writer
+            .write_all(conflict.text.as_bytes())
+            .map_err(io_error)?;
+    }
+
     writer
         .start_file("README.md", options)
         .map_err(zip_error)?;
     writer
         .write_all(
-            b"# Dainiki journal\n\nEntries are Markdown files in `YYYY/MM/YYYY-MM-DD.md`.\nDainiki is text-only; media files are not included.\n",
+            b"# Dainiki journal\n\nEntries are Markdown files in `YYYY/MM/YYYY-MM-DD.md`.\nConflict copies use the `YYYY-MM-DD.conflict-<timestamp>.md` suffix and are included.\nDainiki is text-only; media files are not included.\n",
         )
         .map_err(io_error)?;
 
@@ -2486,7 +2836,10 @@ async fn export_zip(state: SharedState) -> Result<(), JsValue> {
         .ok_or_else(|| JsValue::from_str("no document"))?;
 
     download_bytes(&document, &bytes, "dainiki-journal.zip")?;
-    set_data_status(&state, &format!("Exported {count} entries."));
+    set_data_status(
+        &state,
+        &format!("Exported {count} entries and {conflict_count} conflict copies."),
+    );
     Ok(())
 }
 
@@ -3404,6 +3757,17 @@ async fn refresh(state: SharedState) -> Result<(), JsValue> {
 
             borrowed.entries = entries;
             drop(borrowed);
+
+            let conflicts = match opfs::list_conflicts().await {
+                Ok(conflicts) => conflicts,
+                Err(error) => {
+                    web_sys::console::error_1(&error);
+                    Vec::new()
+                }
+            };
+            state.borrow_mut().conflicts = conflicts;
+            render_conflict_indicator(state.clone());
+            render_conflict_panel(state.clone());
             render_ui(state.clone());
         }
         Err(error) => {

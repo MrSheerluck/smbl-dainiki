@@ -49,6 +49,7 @@ pub async fn timeline() -> Result<impl View> {
             welcome_overlay()
             sync_overlay()
             archive_overlay()
+            conflict_overlay()
         </div>
     })
 }
@@ -146,6 +147,64 @@ pub async fn sync_overlay() -> Result<impl View> {
                         "Loading…"
                     </p>
                 </div>
+            </div>
+        </div>
+    })
+}
+
+#[component]
+pub async fn conflict_overlay() -> Result<impl View> {
+    Ok(view! {
+        <div
+            id="conflict-overlay"
+            hidden="true"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conflict-title"
+            class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-20 backdrop-blur-sm sm:pt-24"
+        >
+            <div
+                class="w-full max-w-4xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+            >
+                <div
+                    class="flex items-start justify-between gap-4 border-b border-outline-variant/40 px-5 py-4"
+                >
+                    <div>
+                        <p
+                            class="font-ui text-[9px] uppercase tracking-[0.16em] text-secondary"
+                        >
+                            "Conflict copies"
+                        </p>
+                        <h2
+                            id="conflict-title"
+                            class="mt-1 font-display text-xl text-on-surface"
+                        >
+                            "Review before choosing"
+                        </h2>
+                        <p
+                            class="mt-1 font-ui text-ui-caption text-on-surface-variant/70"
+                        >
+                            "Both versions are kept. The current entry remains canonical until you choose."
+                        </p>
+                    </div>
+                    <button
+                        id="close-conflicts"
+                        type="button"
+                        aria-label="Close conflict copies"
+                        class="rounded px-2 py-1 font-ui text-ui-label text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                    >
+                        "×"
+                    </button>
+                </div>
+                <div
+                    id="conflict-content"
+                    class="max-h-[calc(100vh-11rem)] overflow-y-auto p-5"
+                ></div>
+                <div
+                    id="conflict-status"
+                    aria-live="polite"
+                    class="border-t border-outline-variant/40 px-5 py-2 font-ui text-ui-caption text-on-surface-variant/70"
+                ></div>
             </div>
         </div>
     })
@@ -571,6 +630,32 @@ pub async fn sidebar() -> Result<impl View> {
                         "Import / export"
                     </span>
                 </div>
+
+                <button
+                    id="open-conflicts"
+                    type="button"
+                    hidden="true"
+                    class="w-full rounded-xl border border-secondary/40 bg-secondary/5 px-2.5 py-2 text-left transition-colors hover:border-secondary/70"
+                >
+                    <span class="flex items-center justify-between gap-2">
+                        <span
+                            class="font-ui text-[9px] font-semibold uppercase tracking-[0.12em] text-secondary"
+                        >
+                            "Conflict copies"
+                        </span>
+                        <span
+                            id="conflict-count"
+                            class="font-mono text-[10px] text-secondary"
+                        >
+                            "0"
+                        </span>
+                    </span>
+                    <span
+                        class="mt-1 block font-ui text-[10px] leading-4 text-on-surface-variant/70"
+                    >
+                        "Review and resolve"
+                    </span>
+                </button>
 
                 <button
                     id="open-sync"

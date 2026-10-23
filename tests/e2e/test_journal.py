@@ -338,6 +338,19 @@ class DainikiE2E(unittest.TestCase):
         self.assertTrue(any(".conflict-" in name for name in files), files)
         self.assertEqual(self.read_entry(today), "external")
 
+        self.assertTrue(self.page.locator("#open-conflicts").is_visible())
+        self.assertEqual(self.page.locator("#conflict-count").inner_text(), "1")
+        self.page.locator("#open-conflicts").click()
+        self.page.wait_for_timeout(300)
+        self.assertIn("original local", self.page.locator("#conflict-content").inner_text())
+        self.assertIn("external", self.page.locator("#conflict-content").inner_text())
+
+        self.page.on("dialog", lambda dialog: dialog.accept())
+        self.page.locator('[data-conflict-action="use"]').click()
+        self.page.wait_for_timeout(800)
+        self.assertFalse(self.page.locator("#open-conflicts").is_visible())
+        self.assertEqual(self.read_entry(today), "original local")
+
     def test_export_and_import(self):
         today = self.today()
         yesterday = iso_shift(today, -1)
@@ -346,6 +359,23 @@ class DainikiE2E(unittest.TestCase):
                 {"iso": today, "text": "Today export. #export"},
                 {"iso": yesterday, "text": "Yesterday export. #export"},
             ]
+        )
+        self.page.evaluate(
+            """async (iso) => {
+                const root = await navigator.storage.getDirectory();
+                const journal = await root.getDirectoryHandle("journal");
+                const [year, month] = iso.split("-");
+                const yearDir = await journal.getDirectoryHandle(year);
+                const monthDir = await yearDir.getDirectoryHandle(month);
+                const file = await monthDir.getFileHandle(
+                    `${iso}.conflict-123.md`,
+                    {create: true}
+                );
+                const writable = await file.createWritable();
+                await writable.write("Exported conflict copy.");
+                await writable.close();
+            }""",
+            today,
         )
         self.page.reload(wait_until="networkidle")
         self.page.wait_for_timeout(900)
@@ -362,6 +392,9 @@ class DainikiE2E(unittest.TestCase):
         with zipfile.ZipFile(path) as archive:
             names = archive.namelist()
             self.assertIn(f"{today[:4]}/{today[5:7]}/{today}.md", names)
+            self.assertIn(
+                f"{today[:4]}/{today[5:7]}/{today}.conflict-123.md", names
+            )
             self.assertIn("README.md", names)
 
         self.page.evaluate(

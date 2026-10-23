@@ -1,3 +1,4 @@
+use dainiki_core::parse_date;
 use js_sys::{AsyncIterator, Reflect};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
@@ -6,6 +7,14 @@ use web_sys::{
     FileSystemGetFileOptions, FileSystemHandle, FileSystemHandleKind,
     FileSystemWritableFileStream,
 };
+
+#[derive(Clone)]
+pub struct ConflictCopy {
+    pub name: String,
+    pub iso: String,
+    pub timestamp: u64,
+    pub text: String,
+}
 
 pub async fn read_entry(iso: &str) -> Result<Option<String>, JsValue> {
     let month_dir = match journal_dir(iso, false).await {
@@ -133,6 +142,143 @@ pub async fn list_entries() -> Result<Vec<(String, String)>, JsValue> {
     }
 
     Ok(entries)
+}
+
+pub async fn list_conflicts() -> Result<Vec<ConflictCopy>, JsValue> {
+    let root = storage_root().await?;
+    let journal = match directory(&root, "journal", false).await {
+        Ok(dir) => dir,
+        Err(error) if is_not_found(&error) => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+
+    let mut conflicts = Vec::new();
+    let years = journal.values();
+
+    while let Some(handle) = next_handle(&years).await? {
+        if handle.kind() != FileSystemHandleKind::Directory {
+            continue;
+        }
+
+        let year = handle.name();
+        if year.len() != 4 || !year.chars().all(|ch| ch.is_ascii_digit()) {
+            continue;
+        }
+
+        let year_dir: FileSystemDirectoryHandle = handle.unchecked_into();
+        let months = year_dir.values();
+
+        while let Some(month) = next_handle(&months).await? {
+            if month.kind() != FileSystemHandleKind::Directory {
+                continue;
+            }
+
+            let month_name = month.name();
+            if month_name.len() != 2 || !month_name.chars().all(|ch| ch.is_ascii_digit()) {
+                continue;
+            }
+
+            let month_dir: FileSystemDirectoryHandle = month.unchecked_into();
+            let files = month_dir.values();
+
+            while let Some(file) = next_handle(&files).await? {
+                if file.kind() != FileSystemHandleKind::File {
+                    continue;
+                }
+
+                let name = file.name();
+                let Some(stem) = name.strip_suffix(".md") else {
+                    continue;
+                };
+                let Some((iso, stamp)) = stem.split_once(".conflict-") else {
+                    continue;
+                };
+                let Some(timestamp) = stamp.parse::<u64>().ok() else {
+                    continue;
+                };
+                if parse_date(iso).is_none() {
+                    continue;
+                }
+
+                let file_handle: FileSystemFileHandle = file.unchecked_into();
+                let text = read_file(&file_handle).await?;
+                let iso = iso.to_string();
+                conflicts.push(ConflictCopy {
+                    name,
+                    iso,
+                    timestamp,
+                    text,
+                });
+            }
+        }
+    }
+
+    conflicts.sort_by(|left, right| {
+        right
+            .iso
+            .cmp(&left.iso)
+            .then_with(|| right.timestamp.cmp(&left.timestamp))
+    });
+
+    Ok(conflicts)
+}
+
+pub async fn delete_conflict(iso: &str, name: &str) -> Result<(), JsValue> {
+    let month_dir = match journal_dir(iso, false).await {
+        Ok(dir) => dir,
+        Err(error) if is_not_found(&error) => return Ok(()),
+        Err(error) => return Err(error),
+    };
+
+    match JsFuture::from(month_dir.remove_entry(name)).await {
+        Ok(_) => Ok(()),
+        Err(error) if is_not_found(&error) => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+pub async fn read_base(iso: &str) -> Result<Option<String>, JsValue> {
+    let root = storage_root().await?;
+    let base_dir = match directory(&root, "sync-base", false).await {
+        Ok(dir) => dir,
+        Err(error) if is_not_found(&error) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let handle = match file_handle(&base_dir, &format!("{iso}.md"), false).await {
+        Ok(handle) => handle,
+        Err(error) if is_not_found(&error) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+
+    Ok(Some(read_file(&handle).await?))
+}
+
+pub async fn write_base(iso: &str, text: &str) -> Result<(), JsValue> {
+    let root = storage_root().await?;
+    let base_dir = directory(&root, "sync-base", true).await?;
+    let handle = file_handle(&base_dir, &format!("{iso}.md"), true).await?;
+    let writable: FileSystemWritableFileStream = JsFuture::from(handle.create_writable())
+        .await?
+        .dyn_into()?;
+
+    JsFuture::from(writable.write_with_str(text)?).await?;
+    JsFuture::from(writable.close()).await?;
+    Ok(())
+}
+
+pub async fn delete_base(iso: &str) -> Result<(), JsValue> {
+    let root = storage_root().await?;
+    let base_dir = match directory(&root, "sync-base", false).await {
+        Ok(dir) => dir,
+        Err(error) if is_not_found(&error) => return Ok(()),
+        Err(error) => return Err(error),
+    };
+
+    match JsFuture::from(base_dir.remove_entry(&format!("{iso}.md"))).await {
+        Ok(_) => Ok(()),
+        Err(error) if is_not_found(&error) => Ok(()),
+        Err(error) => Err(error),
+    }
 }
 
 async fn storage_root() -> Result<FileSystemDirectoryHandle, JsValue> {

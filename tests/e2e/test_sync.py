@@ -178,6 +178,12 @@ class DainikiSyncE2E(unittest.TestCase):
         page.click('[data-sync-action="unlock"]')
         return self.wait_for_sync(page)
 
+    def enable_auto_merge(self, page):
+        if page.locator("#sync-auto-merge").count():
+            if not page.locator("#sync-auto-merge").is_checked():
+                page.locator("#sync-auto-merge").check()
+                page.wait_for_timeout(250)
+
     def local_files(self, page):
         return page.evaluate(
             """async () => {
@@ -307,6 +313,87 @@ class DainikiSyncE2E(unittest.TestCase):
         self.click_sync_now(self.page)
         self.assertEqual(self.page.locator("#entry-editor").inner_text().strip(), "")
         self.assertNotIn("shared baseline", self.page.locator("#timeline-entries").inner_text())
+
+    def test_auto_merge_non_overlapping_and_conflict_fallback(self):
+        email = self.email()
+        self.activate(self.page, email)
+        self.open_journal(self.page)
+        today = time.strftime("%Y-%m-%d")
+        self.seed(
+            self.page,
+            [{"iso": today, "text": "line one\nline two\nline three"}],
+        )
+        self.assertIn("Synced 1 up", self.setup_sync(self.page))
+        self.enable_auto_merge(self.page)
+
+        device_two = self.new_page()
+        self.signin(device_two, email)
+        self.open_journal(device_two)
+        self.assertIn("1 down", self.unlock_sync(device_two))
+        self.enable_auto_merge(device_two)
+        self.assertTrue(device_two.locator("#sync-auto-merge").is_checked())
+        base_text = device_two.evaluate(
+            """async (iso) => {
+                const root = await navigator.storage.getDirectory();
+                const base = await root.getDirectoryHandle("sync-base");
+                const file = await base.getFileHandle(`${iso}.md`);
+                return await (await file.getFile()).text();
+            }""",
+            today,
+        )
+        self.assertEqual(base_text, "line one\nline two\nline three")
+
+        self.page.click("#close-sync")
+        self.page.locator("#entry-editor .line").nth(0).click()
+        self.page.keyboard.press("End")
+        self.page.keyboard.type(" A")
+        self.page.wait_for_timeout(800)
+        self.open_sync(self.page)
+        self.assertIn("Synced", self.click_sync_now(self.page))
+
+        device_two.click("#close-sync")
+        device_two.locator("#entry-editor .line").nth(2).click()
+        device_two.keyboard.press("End")
+        device_two.keyboard.type(" B")
+        device_two.wait_for_timeout(800)
+        self.open_sync(device_two)
+        panel = self.click_sync_now(device_two)
+        self.assertIn("auto-merged", panel)
+        self.assertFalse(device_two.locator("#open-conflicts").is_visible())
+        self.assertEqual(
+            device_two.locator("#entry-editor").inner_text(),
+            "line one A\nline two\nline three B",
+        )
+
+        self.open_sync(self.page)
+        self.click_sync_now(self.page)
+        self.assertIn("line three B", self.page.locator("#entry-editor").inner_text())
+
+        # Overlapping edits still produce a conflict copy.
+        self.page.click("#close-sync")
+        self.page.locator("#entry-editor .line").nth(0).click()
+        self.page.keyboard.press("End")
+        self.page.keyboard.type(" X")
+        self.page.wait_for_timeout(800)
+        self.open_sync(self.page)
+        self.click_sync_now(self.page)
+
+        device_two.click("#close-sync")
+        device_two.locator("#entry-editor .line").nth(0).click()
+        device_two.keyboard.press("End")
+        device_two.keyboard.type(" Y")
+        device_two.wait_for_timeout(800)
+        self.open_sync(device_two)
+        panel = self.click_sync_now(device_two)
+        self.assertIn("conflict copies saved", panel)
+        self.assertTrue(device_two.locator("#open-conflicts").is_visible())
+
+        device_two.click("#close-sync")
+        device_two.locator("#open-conflicts").click()
+        device_two.wait_for_timeout(300)
+        self.assertIn("CONFLICT VERSION", device_two.locator("#conflict-content").inner_text())
+        self.assertIn("line one A", device_two.locator("#conflict-content").inner_text())
+        self.assertIn("line one A Y", device_two.locator("#conflict-content").inner_text())
 
     def test_recent_first_download_and_download_all(self):
         email = self.email()

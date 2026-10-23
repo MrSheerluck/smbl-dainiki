@@ -187,8 +187,9 @@ and Dodo subscription checkout/webhooks. Sync derives an Argon2id key from a
 separate passphrase, wraps the master key with a one-time recovery key, encrypts
 every manifest and entry with XChaCha20-Poly1305, and stores only ciphertext in
 S3-compatible object storage. Presigned URLs keep entry bytes off the app
-server. The client syncs recent entries first (30 by default), supports an
-explicit “Download all entries” action, detects conflicts with base hashes and
+server, and R2 object keys use opaque HMAC-derived ids rather than dates. The
+client syncs recent entries first (30 by default), supports an explicit
+“Download all entries” action, detects conflicts with base hashes and
 writes local `.conflict-<timestamp>.md` copies, and propagates encrypted entry
 deletions as tombstones. The full suite has 28 browser tests.
 

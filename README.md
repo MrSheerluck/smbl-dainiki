@@ -165,7 +165,7 @@ manual sign-off:
   shows Markdown source, inactive lines render inline.
 - Daily editor with previous/next day navigation.
 - Timeline built by scanning the stored files.
-- Live tag counts, clickable tag filters, and a calendar with entry dots.
+- Live tag counts, clickable tag filters, and a calendar with entry marks.
 - Local full-text search with `⌘K`, tag matching, snippets, and keyboard navigation.
 - Light/dark theme with a persisted preference and system default.
 - Conflict copies when a file changes outside the app; local edits are preserved.
@@ -177,8 +177,9 @@ manual sign-off:
 - Installable PWA with an offline app shell.
 - Incremental timeline pagination and a mobile sidebar drawer.
 - First-run onboarding with a persistent-storage request.
-- Fourteen local journal browser tests covering storage, editing, search, themes, zen mode,
-  conflicts, import/export, offline mode, and mobile.
+- Fifteen local journal browser tests covering storage, editing, search, themes,
+  zen mode, explicit data-panel entry management, conflicts, import/export,
+  offline mode, and mobile.
 
 Accounts, auth, billing, and encrypted sync are working: email/password signup,
 Argon2id hashing, Postgres-backed sessions, email verification, password reset,
@@ -193,7 +194,7 @@ client syncs recent entries first (30 by default), supports an explicit
 writes local `.conflict-<timestamp>.md` copies that can be reviewed, restored,
 downloaded, or deleted in the app, and propagates encrypted entry deletions as
 tombstones. An optional diff3 mode automatically merges non-overlapping edits;
-overlapping edits still become conflict copies. Paid devices remember the sync key after the first passphrase setup or unlock, so sync stays on automatically; **Forget this device** removes the local key. The full suite has 33 browser tests.
+overlapping edits still become conflict copies. Paid devices remember the sync key after the first passphrase setup or unlock, so sync stays on automatically; **Forget this device** removes the local key. The full suite has 34 browser tests.
 
 Local billing runs in mock mode by default. Real checkout uses Dodo test or live
 mode with two subscription products and a webhook endpoint. No free trial; the

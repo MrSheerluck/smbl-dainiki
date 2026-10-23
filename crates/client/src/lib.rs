@@ -12,7 +12,7 @@ use std::{
 };
 
 use dainiki_core::{
-    month_year, parse_date, parse_entry,
+    month_short, month_year, parse_date, parse_entry,
     sync_crypto::{
         ManifestEntry, SyncManifest, bytes_hash, content_hash, create_sync_keys, decrypt_entry,
         decrypt_manifest, encrypt_entry, encrypt_manifest, sync_entry_id,
@@ -60,6 +60,8 @@ struct State {
     search_matches: Vec<String>,
     search_selected: usize,
     data_overlay: Element,
+    data_entries: Element,
+    data_entry_count: Element,
     data_status: Element,
     archive_overlay: Element,
     archive_content: Element,
@@ -175,6 +177,8 @@ pub fn start() -> Result<(), JsValue> {
         search_matches: Vec::new(),
         search_selected: 0,
         data_overlay: element(&document, "#data-overlay")?,
+        data_entries: element(&document, "#data-entries")?,
+        data_entry_count: element(&document, "#data-entry-count")?,
         data_status: element(&document, "#data-status")?,
         archive_overlay: element(&document, "#archive-overlay")?,
         archive_content: element(&document, "#archive-content")?,
@@ -1358,12 +1362,34 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
-    let delete_entry_state = state.clone();
+    let data_entries_state = state.clone();
     listen(
-        element(document, "#delete-entry")?.as_ref(),
+        state.borrow().data_entries.as_ref(),
         "click",
-        Closure::<dyn FnMut(Event)>::new(move |_| {
-            spawn_result(delete_current_entry(delete_entry_state.clone()));
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            let Some(target) = target_element(&event) else {
+                return;
+            };
+            let Some(control) = target.closest("[data-data-action]").ok().flatten() else {
+                return;
+            };
+            let Some(action) = control.get_attribute("data-data-action") else {
+                return;
+            };
+            let Some(iso) = control.get_attribute("data-iso") else {
+                return;
+            };
+
+            match action.as_str() {
+                "open" => {
+                    close_data(data_entries_state.clone());
+                    spawn_result(select_date(data_entries_state.clone(), iso));
+                }
+                "delete" => {
+                    spawn_result(delete_entry_at(data_entries_state.clone(), iso));
+                }
+                _ => {}
+            }
         }),
     )?;
 
@@ -1626,6 +1652,7 @@ fn close_sidebar(state: SharedState) {
 }
 
 fn open_data(state: SharedState) {
+    render_data_entries(state.clone());
     state.borrow().data_overlay.remove_attribute("hidden").ok();
     set_data_status(&state, "Markdown only. Media files are ignored.");
 }
@@ -3138,15 +3165,30 @@ fn set_data_status(state: &SharedState, text: &str) {
     state.borrow().data_status.set_text_content(Some(text));
 }
 
-async fn delete_current_entry(state: SharedState) -> Result<(), JsValue> {
-    let iso = state.borrow().selected_iso.clone();
+fn entry_label(iso: &str) -> String {
+    parse_date(iso).map_or_else(
+        || iso.to_string(),
+        |date| {
+            format!(
+                "{}, {} {}, {}",
+                weekday_name(date),
+                month_short(date),
+                date.day(),
+                date.year()
+            )
+        },
+    )
+}
+
+async fn delete_entry_at(state: SharedState, iso: String) -> Result<(), JsValue> {
+    let label = entry_label(&iso);
     let Some(window) = web_sys::window() else {
         return Ok(());
     };
 
     let confirmed = window
         .confirm_with_message(&format!(
-            "Delete the entry for {iso}? This cannot be undone. If sync is on, the deletion syncs to your other devices."
+            "Delete the entry for {label}? This cannot be undone. If sync is on, the deletion syncs to your other devices."
         ))
         .unwrap_or(false);
 
@@ -3159,17 +3201,20 @@ async fn delete_current_entry(state: SharedState) -> Result<(), JsValue> {
     opfs::delete_entry(&iso).await?;
     queue_sync_delete(&iso);
 
-    {
-        let mut state = state.borrow_mut();
-        state.has_file = false;
-        state.base_text.clear();
+    let current = state.borrow().selected_iso == iso;
+
+    if current {
+        {
+            let mut state = state.borrow_mut();
+            state.has_file = false;
+            state.base_text.clear();
+        }
+        load_entry(state.clone(), &iso).await?;
     }
 
-    load_entry(state.clone(), &iso).await?;
     refresh(state.clone()).await?;
-    set_data_status(&state, "Entry deleted.");
+    set_data_status(&state, &format!("Deleted {label}."));
     schedule_sync(state.clone());
-    close_data(state);
     Ok(())
 }
 
@@ -4225,20 +4270,39 @@ fn render_ui(state: SharedState) {
         )
     };
 
-    let state = state.borrow();
-    state.timeline.set_inner_html(&timeline);
-    state.tag_list.set_inner_html(&tags);
-    state.calendar.set_inner_html(&calendar);
+    {
+        let view = state.borrow();
+        view.timeline.set_inner_html(&timeline);
+        view.tag_list.set_inner_html(&tags);
+        view.calendar.set_inner_html(&calendar);
 
-    if filter_visible {
-        state.active_filter.remove_attribute("hidden").ok();
-    } else {
-        state.active_filter.set_attribute("hidden", "true").ok();
+        if filter_visible {
+            view.active_filter.remove_attribute("hidden").ok();
+        } else {
+            view.active_filter.set_attribute("hidden", "true").ok();
+        }
+
+        view.active_filter_label
+            .set_text_content(Some(&filter_label));
     }
 
+    render_data_entries(state);
+}
+
+fn render_data_entries(state: SharedState) {
+    let (html, count) = {
+        let state = state.borrow();
+        (
+            render::data_entries(&state.entries, &state.selected_iso),
+            state.entries.len(),
+        )
+    };
+
+    let state = state.borrow();
+    state.data_entries.set_inner_html(&html);
     state
-        .active_filter_label
-        .set_text_content(Some(&filter_label));
+        .data_entry_count
+        .set_text_content(Some(&format!("{count} {}", if count == 1 { "entry" } else { "entries" })));
 }
 
 fn set_active_tag(state: SharedState, tag: Option<String>) {

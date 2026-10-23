@@ -520,16 +520,35 @@ pub async fn data_overlay() -> Result<impl View> {
                         "Import a folder"
                     </button>
                     <div class="border-t border-outline-variant/40 pt-3">
-                        <p class="mb-2 font-ui text-[10px] text-on-surface-variant/60">
-                            "Delete the selected entry. If sync is on, the deletion is encrypted too."
-                        </p>
-                        <button
-                            id="delete-entry"
-                            type="button"
-                            class="w-full rounded border border-secondary/40 px-4 py-2 text-left font-ui text-ui-body text-secondary hover:bg-secondary/5"
+                        <div class="flex items-baseline justify-between gap-3">
+                            <h3
+                                class="font-ui text-[10px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant/70"
+                            >
+                                "Entries"
+                            </h3>
+                            <span
+                                id="data-entry-count"
+                                class="font-ui text-[10px] text-on-surface-variant/50"
+                            >
+                                "0 entries"
+                            </span>
+                        </div>
+                        <p
+                            class="mt-1 font-ui text-[10px] leading-4 text-on-surface-variant/60"
                         >
-                            "Delete selected entry"
-                        </button>
+                            "Open or delete a specific entry. Deletions sync when paid sync is on."
+                        </p>
+                        <div
+                            id="data-entries"
+                            aria-label="Saved entries"
+                            class="mt-2 max-h-64 overflow-y-auto overscroll-contain rounded border border-outline-variant/40"
+                        >
+                            <p
+                                class="px-3 py-3 font-ui text-[10px] text-on-surface-variant/50"
+                            >
+                                "Loading…"
+                            </p>
+                        </div>
                     </div>
                     <p
                         id="data-status"
@@ -745,18 +764,12 @@ pub async fn sidebar() -> Result<impl View> {
                 </nav>
 
                 <div class="mt-6">
-                    <div class="flex items-center justify-between px-2 pb-1">
+                    <div class="px-2 pb-1">
                         <h2
                             class="font-ui text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant/80"
                         >
                             "Tags"
                         </h2>
-                        <button
-                            type="button"
-                            class="font-ui text-ui-label text-on-surface-variant/70 hover:text-on-surface"
-                        >
-                            "+"
-                        </button>
                     </div>
                     <div id="tag-list" class="space-y-0.5">
                         <p
@@ -916,11 +929,6 @@ pub async fn topbar() -> Result<impl View> {
                 >
                     "☰"
                 </button>
-                <div
-                    class="hidden shrink-0 items-center gap-2 border-l border-primary/30 pl-2 font-ui text-[9px] uppercase tracking-[0.14em] text-primary/70 sm:flex"
-                >
-                    "Local · saved"
-                </div>
             </div>
 
             <div class="flex min-w-0 items-center gap-2">

@@ -287,6 +287,65 @@ pub fn tags(entries: &[EntryRecord], active_tag: Option<&str>) -> String {
     html
 }
 
+pub fn data_entries(entries: &[EntryRecord], selected_iso: &str) -> String {
+    if entries.is_empty() {
+        return r#"<p class="px-3 py-4 font-ui text-[10px] text-on-surface-variant/55">No saved entries yet.</p>"#
+            .to_string();
+    }
+
+    let mut entries: Vec<&EntryRecord> = entries.iter().collect();
+    entries.sort_by(|left, right| right.iso.cmp(&left.iso));
+
+    let mut html = String::new();
+
+    for entry in entries {
+        let date = entry.meta.date;
+        let date_label = format!(
+            "{}, {} {}, {}",
+            weekday_name(date),
+            month_short(date),
+            date.day(),
+            date.year()
+        );
+        let excerpt = if entry.text.trim().is_empty() {
+            "Empty entry".to_string()
+        } else {
+            escape_html(&entry.meta.excerpt)
+        };
+        let current = if entry.iso == selected_iso {
+            "true"
+        } else {
+            "false"
+        };
+        let current_label = if entry.iso == selected_iso {
+            r#"<span class="font-ui text-[8px] uppercase tracking-[0.14em] text-primary/70">Current</span>"#
+        } else {
+            ""
+        };
+
+        let _ = write!(
+            html,
+            r##"<div class="flex items-center gap-2 border-b border-outline-variant/30 last:border-0" data-data-entry="{iso}">
+  <button type="button" data-data-action="open" data-iso="{iso}" aria-current="{current}" class="group min-w-0 flex-1 px-3 py-2 text-left hover:bg-surface-container/60">
+    <span class="flex items-baseline gap-2">
+      <span class="font-ui text-ui-label text-on-surface group-hover:text-primary">{date_label}</span>
+      {current_label}
+    </span>
+    <span class="mt-0.5 block truncate font-journal text-[11px] text-on-surface-variant/55">{excerpt}</span>
+  </button>
+  <button type="button" data-data-action="delete" data-iso="{iso}" aria-label="Delete {date_label}" class="mr-2 shrink-0 rounded px-2 py-1 font-ui text-[10px] text-on-surface-variant/60 hover:bg-secondary/5 hover:text-secondary">Delete</button>
+</div>"##,
+            iso = escape_html(&entry.iso),
+            current = current,
+            date_label = escape_html(&date_label),
+            current_label = current_label,
+            excerpt = excerpt,
+        );
+    }
+
+    html
+}
+
 pub fn calendar(
     year: i32,
     month: u32,

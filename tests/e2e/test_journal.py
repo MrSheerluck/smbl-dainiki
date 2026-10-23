@@ -373,6 +373,30 @@ class DainikiE2E(unittest.TestCase):
         self.page.wait_for_timeout(700)
         self.assertIsNone(self.page.evaluate("document.documentElement.dataset.zen"))
 
+    def test_data_panel_deletes_exact_entry(self):
+        today = self.today()
+        yesterday = iso_shift(today, -1)
+        self.seed([{"iso": yesterday, "text": "Remove this entry only."}])
+        self.page.reload(wait_until="networkidle")
+        self.wait_for_editor()
+        self.type_today("Keep this entry.")
+
+        self.page.locator("#open-data").click()
+        self.page.wait_for_timeout(300)
+        self.assertEqual(self.page.locator("#data-entries [data-data-entry]").count(), 2)
+
+        self.page.on("dialog", lambda dialog: dialog.accept())
+        self.page.locator(
+            f"#data-entries [data-data-action='delete'][data-iso='{yesterday}']"
+        ).click()
+        self.page.wait_for_timeout(900)
+
+        self.assertIn("Deleted", self.page.locator("#data-status").inner_text())
+        self.assertFalse(any(yesterday in name for name in self.list_files()))
+        self.assertIn("Keep this entry.", self.page.locator("#entry-editor").inner_text())
+        self.assertEqual(self.page.locator("#data-entries [data-data-entry]").count(), 1)
+        self.assertIn("1 entry", self.page.locator("#data-entry-count").inner_text())
+
     def test_theme_persists(self):
         self.page.locator("#theme-toggle").click()
         self.page.wait_for_timeout(300)

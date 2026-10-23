@@ -50,6 +50,7 @@ Journal (`test_journal.py`):
 - light/dark theme persistence
 - sidebar search and settings (theme, journal size, spellcheck)
 - zen mode with keyboard toggle, persistence, and exit
+- data panel entry list with explicit open and delete actions
 - external-change conflict copies
 - export zip, clear OPFS, import zip
 - service worker offline shell

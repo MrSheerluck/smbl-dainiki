@@ -28,6 +28,7 @@ services:
       APP_BASE_URL: http://127.0.0.1:3000
       AUTH_EMAIL_MODE: file
       MAIL_OUTBOX_DIR: /app/data/outbox
+      BILLING_MODE: mock
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

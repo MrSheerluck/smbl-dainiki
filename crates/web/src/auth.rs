@@ -26,7 +26,11 @@ use topcoat::{
     view::{View, view},
 };
 
-use crate::mail;
+use crate::{
+    billing::billing_section,
+    dodo::{self, BillingMode},
+    mail,
+};
 
 const SESSION_LIFETIME: Duration = Duration::from_secs(60 * 60 * 24 * 30);
 const SESSION_REFRESH_WINDOW_SECS: i64 = 60 * 60 * 24 * 7;
@@ -268,7 +272,7 @@ pub async fn current_user(cx: &Cx) -> Result<Option<CurrentUser>> {
     }))
 }
 
-async fn require_user(cx: &Cx) -> Result<CurrentUser> {
+pub(crate) async fn require_user(cx: &Cx) -> Result<CurrentUser> {
     match current_user(cx).await? {
         Some(user) => Ok(user),
         None => Err(see_other("/signin").into()),
@@ -878,6 +882,46 @@ pub async fn delete_account(
         );
     }
 
+    let subscription: Option<(String, String)> = sqlx::query_as(
+        "SELECT dodo_subscription_id, status FROM subscriptions WHERE user_id = $1",
+    )
+    .bind(user.id)
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some((subscription_id, status)) = subscription {
+        let needs_cancellation = matches!(
+            status.as_str(),
+            "active" | "past_due" | "on_hold" | "paused"
+        );
+
+        if needs_cancellation && dodo::mode() == BillingMode::Dodo {
+            let Some(config) = dodo::config() else {
+                return account_view(
+                    cx,
+                    user,
+                    None,
+                    Some("Could not cancel your subscription. Manage billing first.".to_string()),
+                );
+            };
+
+            if let Err(error) = dodo::cancel_subscription(&config, &subscription_id).await {
+                eprintln!("[auth] subscription cancellation failed: {error}");
+                return account_view(
+                    cx,
+                    user,
+                    None,
+                    Some(
+                        "Could not cancel your subscription. Open billing and cancel it first."
+                            .to_string(),
+                    ),
+                );
+            }
+
+            audit(cx, pool, Some(user.id), "subscription_cancelled").await;
+        }
+    }
+
     audit(cx, pool, Some(user.id), "account_deleted").await;
     sqlx::query("DELETE FROM users WHERE id = $1")
         .bind(user.id)
@@ -1215,7 +1259,7 @@ async fn replace_password_with_token(
     Ok(Some(user_id))
 }
 
-async fn rate_limit_allows(
+pub(crate) async fn rate_limit_allows(
     pool: &PgPool,
     key: &str,
     limit: i32,
@@ -1242,7 +1286,7 @@ async fn rate_limit_allows(
     Ok(count <= limit)
 }
 
-async fn audit(cx: &Cx, pool: &PgPool, user_id: Option<i64>, action: &str) {
+pub(crate) async fn audit(cx: &Cx, pool: &PgPool, user_id: Option<i64>, action: &str) {
     let ip = client_ip(cx).map(|ip| ip.to_string());
     let user_agent = headers(cx)
         .get("user-agent")
@@ -2031,6 +2075,7 @@ fn account_view(
     } else {
         "Email not verified"
     };
+    let user_id = user.id;
     let csrf_token = user.csrf_token;
     let email = user.email;
     let verified = user.verified;
@@ -2101,7 +2146,9 @@ fn account_view(
                             <dt class="font-ui text-ui-label text-on-surface-variant">
                                 "Email"
                             </dt>
-                            <dd class="break-all text-right font-ui text-ui-body text-on-surface">
+                            <dd
+                                class="break-all text-right font-ui text-ui-body text-on-surface"
+                            >
                                 (email)
                             </dd>
                         </div>
@@ -2143,6 +2190,7 @@ fn account_view(
                         </div>
                     </dl>
 
+                    billing_section(user_id: user_id, csrf_token: csrf_token.clone())
                     <section class="mt-8 border-t border-outline-variant/30 pt-6">
                         <h2 class="font-display text-xl text-on-surface">
                             "Email address"

@@ -16,6 +16,8 @@ serde_json = "1.0.154"
 sha2 = "0.11"
 getrandom = "0.4"
 base64 = "0.22"
+hmac = "0.13"
+time = { version = "0.3.55", features = ["parsing", "formatting"] }
 
 [build-dependencies]
 topcoat = { version = "0.10.0", default-features = false, features = ["tailwind"] }

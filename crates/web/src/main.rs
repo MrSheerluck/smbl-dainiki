@@ -1,6 +1,8 @@
 mod app;
 mod auth;
+mod billing;
 mod db;
+mod dodo;
 mod health;
 mod layout;
 mod mail;
@@ -44,6 +46,11 @@ async fn main() {
         .page(auth::change_password)
         .page(auth::delete_account)
         .route(auth::signout)
+        .page(billing::billing_page)
+        .page(billing::billing_checkout)
+        .route(billing::billing_return)
+        .page(billing::billing_portal)
+        .route(billing::billing_webhook)
         .route(health::health)
         .route(health::ready)
         .public_dir("web/client")

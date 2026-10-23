@@ -32,6 +32,10 @@ pub async fn connect() -> Result<PgPool> {
         .bind(now)
         .execute(&pool)
         .await?;
+    sqlx::query("DELETE FROM billing_events WHERE received_at < $1")
+        .bind(now - 60 * 60 * 24 * 90)
+        .execute(&pool)
+        .await?;
     sqlx::query("DELETE FROM rate_limits WHERE window_start < $1")
         .bind(now - 86_400)
         .execute(&pool)

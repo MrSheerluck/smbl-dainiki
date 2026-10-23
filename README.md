@@ -55,6 +55,22 @@ In local development, verification and reset emails are written to
 `AUTH_EMAIL_MODE=resend` with `RESEND_API_KEY` for real delivery. Production
 defaults to Resend when `APP_BASE_URL` uses `https://`.
 
+Local billing defaults to `BILLING_MODE=mock`, which activates a plan without
+taking a payment. For Dodo test or live mode, set:
+
+```sh
+BILLING_MODE=dodo
+DODO_PAYMENTS_ENVIRONMENT=test_mode   # or live_mode
+DODO_PAYMENTS_API_KEY=...
+DODO_PAYMENTS_WEBHOOK_KEY=...
+DODO_MONTHLY_PRODUCT_ID=...
+DODO_YEARLY_PRODUCT_ID=...
+```
+
+Create two recurring products in Dodo (monthly $2, yearly $20), then point the
+webhook endpoint at `/api/billing/webhook` and subscribe it to the
+`subscription.*` events. Dodo is the merchant of record and handles tax.
+
 Run the browser suites with the server running:
 
 ```sh

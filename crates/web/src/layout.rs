@@ -19,6 +19,8 @@ pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
         "/forgot-password" => "Reset password · Dainiki",
         "/reset-password" => "Choose a new password · Dainiki",
         "/account" => "Account · Dainiki",
+        "/billing" => "Sync & billing · Dainiki",
+        "/billing/return" => "Billing · Dainiki",
         _ => "Dainiki",
     };
 

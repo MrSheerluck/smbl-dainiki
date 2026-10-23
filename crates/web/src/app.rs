@@ -454,7 +454,7 @@ pub async fn sidebar() -> Result<impl View> {
                 </div>
 
                 <a
-                    href="/signup"
+                    href="/billing"
                     class="flex items-center justify-between px-1 font-ui text-ui-label text-on-surface-variant hover:text-on-surface"
                 >
                     <span class="flex items-center gap-2">

@@ -127,9 +127,13 @@ async fn send_resend(to: &str, subject: &str, body: &str) -> Result<()> {
         )
     })?;
     let from = env::var("EMAIL_FROM").unwrap_or_else(|_| "Dainiki <hello@smbl.dev>".to_string());
+    let api_base = env::var("RESEND_API_BASE_URL")
+        .unwrap_or_else(|_| "https://api.resend.com".to_string())
+        .trim_end_matches('/')
+        .to_string();
 
     let response = reqwest::Client::new()
-        .post("https://api.resend.com/emails")
+        .post(format!("{api_base}/emails"))
         .bearer_auth(api_key)
         .json(&serde_json::json!({
             "from": from,

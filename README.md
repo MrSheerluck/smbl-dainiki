@@ -55,6 +55,22 @@ In local development, verification and reset emails are written to
 `AUTH_EMAIL_MODE=resend` with `RESEND_API_KEY` for real delivery. Production
 defaults to Resend when `APP_BASE_URL` uses `https://`.
 
+Resend has an official CLI:
+
+```sh
+curl -fsSL https://resend.com/install.sh | bash
+resend login
+resend domains list
+resend emails send \
+  --from "Dainiki <hello@smbl.dev>" \
+  --to delivered@resend.dev \
+  --subject "Dainiki test" \
+  --text "Resend is working."
+```
+
+The sender domain must be verified in Resend. Set `EMAIL_FROM` to a verified
+address, then switch `AUTH_EMAIL_MODE=resend`.
+
 Local billing defaults to `BILLING_MODE=mock`, which activates a plan without
 taking a payment. For Dodo test or live mode, set:
 

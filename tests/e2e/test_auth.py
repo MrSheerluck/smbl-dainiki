@@ -44,7 +44,7 @@ class DainikiAuthE2E(unittest.TestCase):
         return f"e2e+{time.time_ns()}@example.com"
 
     def goto(self, path):
-        self.page.goto(f"{BASE_URL}{path}", wait_until="networkidle")
+        self.page.goto(f"{BASE_URL}{path}", wait_until="domcontentloaded")
 
     def signup(self, email, password=PASSWORD, plan="monthly"):
         self.goto("/signup")

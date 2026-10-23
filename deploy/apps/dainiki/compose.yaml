@@ -1,0 +1,37 @@
+name: dainiki
+
+services:
+  dainiki:
+    image: ${DAINIKI_IMAGE:-ghcr.io/mrsheerluck/smbl-dainiki:latest}
+    container_name: dainiki
+    restart: unless-stopped
+    pull_policy: always
+    env_file:
+      - .env
+    networks:
+      - smbl_edge
+      - smbl_db
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/api/ready >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  smbl_edge:
+    external: true
+  smbl_db:
+    external: true

@@ -14,9 +14,25 @@ use topcoat::{
     asset::{AssetBundle, RouterBuilderAssetExt},
     cookie::RouterBuilderCookieExt,
     font::RouterBuilderFontExt,
-    router::{Router, RouterBuilderDirectoryExt},
+    router::{Router, RouterBuilderDirectoryExt, TrustedProxies},
     session::RouterBuilderSessionExt,
 };
+
+fn trusted_proxies_from_env() -> Option<TrustedProxies> {
+    let networks: Vec<String> = std::env::var("TRUSTED_PROXY_NETWORKS")
+        .ok()?
+        .split(',')
+        .map(str::trim)
+        .filter(|network| !network.is_empty())
+        .map(str::to_string)
+        .collect();
+
+    if networks.is_empty() {
+        return None;
+    }
+
+    Some(TrustedProxies::new().networks(networks))
+}
 
 #[tokio::main]
 async fn main() {
@@ -27,7 +43,7 @@ async fn main() {
         .expect("could not connect to Postgres; is `docker compose up -d db` running?");
 
     let storage = sync_storage::SyncStorage::from_env();
-    let router = Router::builder()
+    let mut builder = Router::builder()
         .app_context(database)
         .app_context(storage)
         .cookies()
@@ -69,8 +85,13 @@ async fn main() {
         .public_dir("web/client")
         .assets(AssetBundle::load().unwrap())
         .font(typography::INTER)
-        .font(typography::NEWSREADER)
-        .build();
+        .font(typography::NEWSREADER);
+
+    if let Some(trusted_proxies) = trusted_proxies_from_env() {
+        builder = builder.trusted_proxies(trusted_proxies);
+    }
+
+    let router = builder.build();
 
     topcoat::start(router).await.unwrap();
 }

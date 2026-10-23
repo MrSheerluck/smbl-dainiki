@@ -1,0 +1,10 @@
+tunnel: f637fbff-df5f-4347-a60c-8f5a1bac7a2b
+credentials-file: /etc/cloudflared/tunnel.json
+
+ingress:
+  - hostname: app.dainiki.smbl.dev
+    service: http://caddy:80
+    originRequest:
+      connectTimeout: 10s
+      noHappyEyeballs: true
+  - service: http_status:404

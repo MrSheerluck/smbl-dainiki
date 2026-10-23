@@ -32,3 +32,6 @@
 # Python
 __pycache__/
 *.pyc
+
+# Production tunnel credentials
+deploy/shared/cloudflared/tunnel.json

@@ -632,3 +632,126 @@ html[data-editor-size="large"] .live-editor .line {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Zen mode: the journal page becomes the room. */
+.app-sidebar {
+  overflow: hidden;
+}
+
+.app-sidebar,
+.app-topbar,
+.app-main,
+.journal-column,
+#timeline-entries,
+.journal-page {
+  transition:
+    width 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 460ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 460ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 300ms ease,
+    border-color 300ms ease,
+    background-color 300ms ease,
+    box-shadow 300ms ease;
+}
+
+.app-topbar {
+  overflow: hidden;
+}
+
+#timeline-entries {
+  max-height: 20000px;
+  opacity: 1;
+  visibility: visible;
+}
+
+.zen-exit {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px) scale(0.98);
+  transition:
+    opacity 220ms ease,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+html[data-zen="true"] .zen-exit {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+html[data-zen="true"] .app-sidebar {
+  width: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  border-right-width: 0;
+}
+
+html[data-zen="true"] .app-topbar {
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  border-bottom-width: 0;
+}
+
+html[data-zen="true"] .app-main {
+  padding-top: 4.5rem;
+  padding-bottom: 4.5rem;
+  background-image:
+    radial-gradient(
+      circle at 50% 0%,
+      color-mix(in oklab, var(--color-primary) 5%, transparent) 0,
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 100% 80%,
+      color-mix(in oklab, var(--color-secondary) 4%, transparent) 0,
+      transparent 36%
+    );
+}
+
+html[data-zen="true"] .journal-column {
+  max-width: 46rem;
+}
+
+html[data-zen="true"] .journal-page {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+html[data-zen="true"] #timeline-entries {
+  max-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  margin-top: 0;
+  pointer-events: none;
+}
+
+html[data-zen="true"] #active-filter {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-zen="true"] .journal-page {
+    animation: zen-page-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes zen-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

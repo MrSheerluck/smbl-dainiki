@@ -233,6 +233,7 @@ pub fn start() -> Result<(), JsValue> {
     }));
 
     init_theme(&document)?;
+    apply_zen(&document, zen_enabled())?;
     init_editor_preferences(&state, &document)?;
     bind_events(&state, &document)?;
     update_labels(&state);
@@ -410,6 +411,48 @@ fn apply_spellcheck(state: &SharedState, enabled: bool) {
     }
 }
 
+fn zen_enabled() -> bool {
+    local_storage()
+        .and_then(|storage| storage.get_item("dainiki-zen").ok().flatten())
+        .as_deref()
+        == Some("true")
+}
+
+fn apply_zen(document: &Document, enabled: bool) -> Result<(), JsValue> {
+    let root = document
+        .document_element()
+        .ok_or_else(|| JsValue::from_str("no document element"))?;
+
+    if enabled {
+        root.set_attribute("data-zen", "true")?;
+    } else {
+        root.remove_attribute("data-zen").ok();
+    }
+
+    if let Some(storage) = local_storage() {
+        storage
+            .set_item("dainiki-zen", if enabled { "true" } else { "false" })
+            .ok();
+    }
+
+    if let Some(button) = document.query_selector("#toggle-zen")? {
+        button.set_attribute(
+            "aria-label",
+            if enabled { "Exit zen mode" } else { "Enter zen mode" },
+        )?;
+    }
+
+    Ok(())
+}
+
+fn toggle_zen(document: &Document) -> Result<(), JsValue> {
+    let root = document
+        .document_element()
+        .ok_or_else(|| JsValue::from_str("no document element"))?;
+    let enabled = root.get_attribute("data-zen").as_deref() != Some("true");
+    apply_zen(document, enabled)
+}
+
 fn init_editor_preferences(state: &SharedState, document: &Document) -> Result<(), JsValue> {
     apply_editor_size(document, &editor_size())?;
     apply_spellcheck(state, spellcheck_enabled());
@@ -546,6 +589,11 @@ fn handle_settings_click(state: SharedState, event: Event) {
         "sync" => open_sync(state),
         "data" => open_data(state),
         "conflicts" => open_conflicts(state),
+        "zen" => {
+            if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+                let _ = toggle_zen(&document);
+            }
+        }
         _ => {}
     }
 }
@@ -1165,6 +1213,24 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
+    let toggle_zen_document = document.clone();
+    listen(
+        element(document, "#toggle-zen")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            let _ = toggle_zen(&toggle_zen_document);
+        }),
+    )?;
+
+    let exit_zen_document = document.clone();
+    listen(
+        element(document, "#exit-zen")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            let _ = apply_zen(&exit_zen_document, false);
+        }),
+    )?;
+
     let open_settings_state = state.clone();
     listen(
         element(document, "#open-settings")?.as_ref(),
@@ -1422,6 +1488,30 @@ fn handle_global_keydown(state: SharedState, event: Event) {
     if modifier && event.key() == "," {
         event.prevent_default();
         open_settings(state);
+        return;
+    }
+
+    if modifier && event.key() == "." {
+        event.prevent_default();
+        if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+            let _ = toggle_zen(&document);
+        }
+        return;
+    }
+
+    if event.key() == "Escape" && zen_enabled() && state.borrow().inline_iso.is_none() {
+        let in_dialog = web_sys::window()
+            .and_then(|window| window.document())
+            .and_then(|document| document.active_element())
+            .and_then(|active| active.closest("[role=\"dialog\"]").ok().flatten())
+            .is_some();
+
+        if !in_dialog {
+            event.prevent_default();
+            if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+                let _ = apply_zen(&document, false);
+            }
+        }
     }
 }
 

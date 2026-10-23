@@ -341,6 +341,30 @@ class DainikiE2E(unittest.TestCase):
         self.page.wait_for_timeout(300)
         self.assertTrue(self.page.locator("#archive-overlay").is_visible())
 
+    def test_zen_mode(self):
+        self.type_today("A quiet room for attention.")
+        self.page.locator("#toggle-zen").click()
+        self.page.wait_for_timeout(800)
+        self.assertEqual(self.page.evaluate("document.documentElement.dataset.zen"), "true")
+        self.assertTrue(self.page.locator("#exit-zen").is_visible())
+        self.assertEqual(
+            self.page.locator(".app-sidebar").evaluate("(el) => getComputedStyle(el).visibility"),
+            "hidden",
+        )
+
+        self.page.keyboard.press(f"{MOD}+.")
+        self.page.wait_for_timeout(700)
+        self.assertIsNone(self.page.evaluate("document.documentElement.dataset.zen"))
+
+        self.page.locator("#toggle-zen").click()
+        self.page.wait_for_timeout(700)
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(800)
+        self.assertEqual(self.page.evaluate("document.documentElement.dataset.zen"), "true")
+        self.page.keyboard.press("Escape")
+        self.page.wait_for_timeout(700)
+        self.assertIsNone(self.page.evaluate("document.documentElement.dataset.zen"))
+
     def test_theme_persists(self):
         self.page.locator("#theme-toggle").click()
         self.page.wait_for_timeout(300)

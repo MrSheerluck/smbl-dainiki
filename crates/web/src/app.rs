@@ -16,12 +16,36 @@ pub async fn timeline() -> Result<impl View> {
                 hidden="true"
                 class="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden"
             ></div>
+            <button
+                id="exit-zen"
+                type="button"
+                class="zen-exit fixed right-5 top-5 z-40 inline-flex items-center gap-2 rounded border border-outline-variant/50 bg-surface-container-lowest/90 px-3 py-2 font-ui text-ui-label text-on-surface-variant shadow-sm backdrop-blur-md hover:border-outline-variant hover:text-on-surface"
+                aria-label="Exit zen mode"
+                title="Exit zen mode (Esc)"
+            >
+                <svg
+                    aria-hidden="true"
+                    class="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.7"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path d="M9 3H3v6"></path>
+                    <path d="M15 3h6v6"></path>
+                    <path d="M9 21H3v-6"></path>
+                    <path d="M15 21h6v-6"></path>
+                </svg>
+                <span>"Exit zen"</span>
+            </button>
             <div class="flex min-w-0 flex-1 flex-col lg:min-h-0">
                 topbar()
                 <main
                     class="app-main flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:min-h-0 lg:overflow-y-auto lg:px-10"
                 >
-                    <div class="mx-auto max-w-5xl space-y-8">
+                    <div class="journal-column mx-auto max-w-5xl space-y-8">
                         today_entry()
                         <div
                             id="active-filter"
@@ -600,7 +624,7 @@ pub async fn today_entry() -> Result<impl View> {
             >
                 <span class="absolute -left-2 top-7 h-px w-3 bg-outline-variant/60"></span>
                 <div
-                    class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)] sm:p-6"
+                    class="journal-page rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)] sm:p-6"
                 >
                     <div
                         id="entry-editor"
@@ -939,6 +963,31 @@ pub async fn topbar() -> Result<impl View> {
                         <path d="M12 17.5h.01"></path>
                     </svg>
                     <span class="hidden sm:inline">"Archive"</span>
+                </button>
+
+                <button
+                    id="toggle-zen"
+                    type="button"
+                    aria-label="Enter zen mode"
+                    title="Zen mode (⌘.)"
+                    class="inline-flex h-9 shrink-0 items-center gap-2 rounded border border-outline-variant/60 px-3 font-ui text-ui-label text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                >
+                    <svg
+                        aria-hidden="true"
+                        class="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="M4 9V5a1 1 0 0 1 1-1h4"></path>
+                        <path d="M15 4h4a1 1 0 0 1 1 1v4"></path>
+                        <path d="M20 15v4a1 1 0 0 1-1 1h-4"></path>
+                        <path d="M9 20H5a1 1 0 0 1-1-1v-4"></path>
+                    </svg>
+                    <span class="hidden sm:inline">"Zen"</span>
                 </button>
 
                 <button

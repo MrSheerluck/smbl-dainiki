@@ -1,39 +1,29 @@
 use topcoat::{
     Result,
-    view::{View, class, component, view},
+    view::{View, component, view},
 };
 
 struct Feature {
-    number: &'static str,
     title: &'static str,
     body: &'static str,
-    accent: &'static str,
 }
 
 const FEATURES: &[Feature] = &[
     Feature {
-        number: "01",
         title: "Text-only by design",
         body: "Dainiki is built around the page. Words, paragraphs, and the quiet accumulation of days.",
-        accent: "text-primary",
     },
     Feature {
-        number: "02",
         title: "Plain Markdown files",
         body: "Every day is a readable .md file in a folder you choose. Open it in Obsidian, Git, or any text editor.",
-        accent: "text-secondary",
     },
     Feature {
-        number: "03",
         title: "Local-first",
         body: "Your browser holds the journal. Write offline, reload, open the same files in another editor. The journal is yours to keep.",
-        accent: "text-primary",
     },
     Feature {
-        number: "04",
         title: "Optional encrypted sync",
         body: "$2/month or $20/year for multi-device sync. End-to-end encrypted, 1 GB, and easy to cancel.",
-        accent: "text-secondary",
     },
 ];
 
@@ -66,19 +56,9 @@ pub async fn features() -> Result<impl View> {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mt-12">
                     for feature in FEATURES {
                         <div
-                            class="p-6 sm:p-7 rounded-xl bg-surface-container-lowest border border-surface-container-high/50 shadow-sm space-y-4"
+                            class="p-6 sm:p-7 rounded-xl bg-surface-container-lowest border border-surface-container-high/50 space-y-4"
                         >
-                            <div class="flex items-center justify-between">
-                                <span
-                                    class=(class!(
-                                        "font-display-date text-display-date-mobile leading-none",
-                                        feature.accent,
-                                    ))
-                                >
-                                    (feature.number)
-                                </span>
-                                <span class="w-1.5 h-1.5 rounded-full bg-primary/70"></span>
-                            </div>
+                            <span class="block h-px w-8 bg-primary/30"></span>
                             <h3
                                 class="font-headline-md text-headline-md text-on-surface"
                             >

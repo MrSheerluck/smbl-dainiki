@@ -1,33 +1,30 @@
 use topcoat::{
     Result,
-    router::href,
-    view::{View, class, component, view},
+    view::{View, component, view},
 };
 
-use crate::{landing::WaitlistStatus, waitlist::join};
-
 #[component]
-pub async fn hero(status: Option<WaitlistStatus>) -> Result<impl View> {
-    let (message, tone) = match status {
-        Some(status) => (status.message(), status.tone_class()),
-        None => ("", ""),
-    };
-
+pub async fn hero() -> Result<impl View> {
     Ok(view! {
         <section
             class="relative w-full overflow-hidden pt-28 pb-16 sm:pt-36 sm:pb-20"
             id="top"
         >
-            <div
-                class="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[420px] bg-gradient-to-b from-primary-fixed/25 via-surface-container-high/40 to-transparent blur-3xl pointer-events-none -z-10"
-            ></div>
             <div class="absolute inset-0 paper-grain pointer-events-none -z-10"></div>
 
             <div
                 class="max-w-5xl mx-auto px-6 lg:px-12 text-center flex flex-col items-center"
             >
+                <p
+                    class="flex items-center gap-3 font-ui-caption text-ui-caption uppercase tracking-[0.18em] text-primary/75"
+                >
+                    <span class="h-px w-7 bg-primary/35"></span>
+                    "Now open · Local-first journal"
+                    <span class="h-px w-7 bg-primary/35"></span>
+                </p>
+
                 <h1
-                    class="font-headline-lg text-[2.6rem] leading-[1.08] sm:text-[3.65rem] sm:leading-[1.04] tracking-tight text-on-surface max-w-4xl text-balance"
+                    class="font-headline-lg text-[2.6rem] leading-[1.08] sm:text-[3.65rem] sm:leading-[1.04] tracking-tight text-on-surface max-w-4xl text-balance mt-7"
                 >
                     "A quiet, continuous river "
                     <br class="hidden sm:inline">
@@ -37,68 +34,31 @@ pub async fn hero(status: Option<WaitlistStatus>) -> Result<impl View> {
                 <p
                     class="font-journal-body-lg text-journal-body-lg text-on-surface-variant max-w-2xl mt-7 leading-relaxed text-pretty"
                 >
-                    "A private, local-first daily journal for the web. Plain Markdown, a calm timeline, tags, search, and a calendar. Sync only if you want it."
+                    "A private, local-first daily journal for the web. Plain Markdown, a calm timeline, tags, search, and a calendar. Yours without an account. Sync only when you want it."
                 </p>
 
-                <p
-                    class="mt-9 font-journal-body text-journal-body text-on-surface-variant max-w-md"
+                <div
+                    class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3"
                 >
-                    "The journal is in development. Join the waitlist for the first release."
-                </p>
-
-                <p
-                    class="mt-4 font-ui-caption text-ui-caption text-on-surface-variant max-w-lg"
-                >
-                    "Local journaling will be free. Sync will be $2/month or $20/year."
-                </p>
-
-                <div id="waitlist" class="mt-7 w-full max-w-md scroll-mt-28">
-                    <form
-                        class="flex flex-col sm:flex-row gap-2 items-stretch"
-                        method="post"
-                        action=(href!(join))
+                    <a
+                        class="inline-flex items-center justify-center px-5 py-2.5 rounded bg-primary text-on-primary font-ui-label text-ui-label hover:bg-primary-container hover:text-on-primary-container transition-colors"
+                        href="https://app.dainiki.smbl.dev/"
                     >
-                        <input
-                            class="flex-1 min-w-0 px-4 py-3 rounded bg-surface-container-lowest border border-surface-container-high text-on-surface font-ui-body placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
-                            type="email"
-                            name="email"
-                            required="true"
-                            maxlength="254"
-                            autocomplete="email"
-                            inputmode="email"
-                            placeholder="you@example.com"
-                            aria-label="Email address"
-                        >
-                        <input
-                            class="hidden"
-                            type="text"
-                            name="website"
-                            tabindex="-1"
-                            autocomplete="off"
-                            aria-hidden="true"
-                        >
-                        <button
-                            class="px-5 py-3 rounded border border-outline-variant bg-surface-container-lowest text-on-surface font-ui-header text-ui-header hover:bg-surface-container transition-all whitespace-nowrap"
-                            type="submit"
-                        >
-                            "Join the waitlist"
-                        </button>
-                    </form>
-                    if !message.is_empty() {
-                        <p
-                            class=(class!("mt-3 font-ui-caption text-ui-caption", tone))
-                            role="status"
-                            aria-live="polite"
-                        >
-                            (message)
-                        </p>
-                    }
-                    <p
-                        class="mt-3 font-ui-caption text-ui-caption text-on-surface-variant/70"
+                        "Open your journal"
+                    </a>
+                    <a
+                        class="inline-flex items-center justify-center px-5 py-2.5 rounded border border-outline-variant text-on-surface font-ui-label text-ui-label hover:bg-surface-container transition-colors"
+                        href="#pricing"
                     >
-                        "No spam. One note when the journal opens."
-                    </p>
+                        "See sync plans"
+                    </a>
                 </div>
+
+                <p
+                    class="mt-5 font-ui-caption text-ui-caption text-on-surface-variant/70"
+                >
+                    "Local journaling is free. Sync is $2/month or $20/year."
+                </p>
             </div>
         </section>
     })

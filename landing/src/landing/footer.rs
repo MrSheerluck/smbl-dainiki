@@ -54,9 +54,9 @@ pub async fn footer() -> Result<impl View> {
                     </a>
                     <a
                         class="font-ui-caption text-ui-caption text-on-surface-variant hover:text-on-surface transition-colors"
-                        href="#waitlist"
+                        href="https://app.dainiki.smbl.dev/"
                     >
-                        "Waitlist"
+                        "Open journal"
                     </a>
                     <a
                         class="font-ui-caption text-ui-caption text-on-surface-variant hover:text-on-surface transition-colors"

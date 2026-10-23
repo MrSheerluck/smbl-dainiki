@@ -87,23 +87,22 @@ pub async fn pricing() -> Result<impl View> {
                             </li>
                         </ul>
                         <div class="mt-auto pt-8">
-                            <button
-                                class="flex items-center justify-center w-full px-5 py-2.5 rounded border border-outline-variant text-on-surface-variant font-ui-label text-ui-label opacity-60 cursor-not-allowed"
-                                type="button"
-                                disabled="true"
+                            <a
+                                class="flex items-center justify-center w-full px-5 py-2.5 rounded border border-outline-variant text-on-surface font-ui-label text-ui-label hover:bg-surface-container transition-colors"
+                                href="https://app.dainiki.smbl.dev/"
                             >
-                                "Coming soon"
-                            </button>
+                                "Start writing free"
+                            </a>
                             <p
                                 class="mt-3 text-center font-ui-caption text-ui-caption text-on-surface-variant/70"
                             >
-                                "Free local journaling at launch."
+                                "No account needed."
                             </p>
                         </div>
                     </div>
 
                     <div
-                        class="relative flex flex-col p-7 rounded-xl bg-surface-container-lowest border-2 border-primary/70 shadow-xl"
+                        class="relative flex flex-col p-7 rounded-xl bg-surface-container-lowest border border-primary/45 shadow-sm"
                     >
                         <div class="flex items-center justify-between">
                             <h3
@@ -164,17 +163,16 @@ pub async fn pricing() -> Result<impl View> {
                             </li>
                         </ul>
                         <div class="mt-auto pt-8 space-y-2">
-                            <button
-                                class="flex items-center justify-center w-full px-5 py-2.5 rounded bg-primary text-on-primary font-ui-label text-ui-label opacity-60 cursor-not-allowed"
-                                type="button"
-                                disabled="true"
+                            <a
+                                class="flex items-center justify-center w-full px-5 py-2.5 rounded bg-primary text-on-primary font-ui-label text-ui-label hover:bg-primary-container hover:text-on-primary-container transition-colors"
+                                href="https://app.dainiki.smbl.dev/signup?plan=monthly"
                             >
-                                "Coming soon"
-                            </button>
+                                "Get encrypted sync"
+                            </a>
                             <p
                                 class="text-center font-ui-caption text-ui-caption text-on-surface-variant/70"
                             >
-                                "Checkout opens at launch. Payments by Dodo Payments."
+                                "Cancel anytime. Payments by Dodo Payments."
                             </p>
                         </div>
                     </div>
@@ -233,17 +231,18 @@ pub async fn pricing() -> Result<impl View> {
                             </li>
                         </ul>
                         <div class="mt-auto pt-8">
-                            <button
-                                class="flex items-center justify-center w-full px-5 py-2.5 rounded border border-outline-variant text-on-surface-variant font-ui-label text-ui-label opacity-60 cursor-not-allowed"
-                                type="button"
-                                disabled="true"
+                            <a
+                                class="flex items-center justify-center w-full px-5 py-2.5 rounded border border-outline-variant text-on-surface font-ui-label text-ui-label hover:bg-surface-container transition-colors"
+                                href="https://github.com/MrSheerluck/smbl-dainiki"
+                                rel="noopener"
+                                target="_blank"
                             >
-                                "Coming soon"
-                            </button>
+                                "View the source"
+                            </a>
                             <p
                                 class="mt-3 text-center font-ui-caption text-ui-caption text-on-surface-variant/70"
                             >
-                                "The self-host guide lands with the app."
+                                "MIT licensed. Setup notes live in the repository."
                             </p>
                         </div>
                     </div>

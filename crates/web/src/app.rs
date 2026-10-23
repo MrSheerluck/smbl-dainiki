@@ -882,26 +882,18 @@ pub async fn sidebar() -> Result<impl View> {
                     type="button"
                     data-sync-state="off"
                     aria-haspopup="dialog"
-                    class="sync-offer group w-full rounded-xl border px-3 py-3 text-left"
+                    class="sync-offer w-full px-1 pt-3 text-left"
                 >
-                    <span class="flex items-center justify-between gap-2">
-                        <span
-                            id="sync-label"
-                            data-sync-state="off"
-                            class="truncate font-ui text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/75"
-                        >
-                            "Dainiki Sync"
-                        </span>
-                        <span
-                            aria-hidden="true"
-                            class="sync-offer-arrow font-mono text-[13px] text-primary/60"
-                        >
-                            "↗"
-                        </span>
+                    <span
+                        id="sync-label"
+                        data-sync-state="off"
+                        class="block truncate font-ui text-[9px] font-semibold uppercase tracking-[0.14em] text-primary/75"
+                    >
+                        "Dainiki Sync"
                     </span>
                     <span
                         id="sync-offer-title"
-                        class="mt-2 block font-display text-[1.05rem] leading-[1.18] tracking-[-0.015em] text-on-surface"
+                        class="mt-1.5 block font-display text-[1.02rem] leading-[1.2] tracking-[-0.015em] text-on-surface"
                     >
                         "Keep your journal on every device."
                     </span>
@@ -912,18 +904,10 @@ pub async fn sidebar() -> Result<impl View> {
                         "End-to-end encrypted. $2/month or $20/year."
                     </span>
                     <span
-                        class="mt-3 flex items-center justify-between border-t border-primary/15 pt-2"
+                        id="sync-cta"
+                        class="mt-2.5 inline-block font-ui text-[10px] text-primary underline decoration-primary/35 underline-offset-4"
                     >
-                        <span
-                            id="sync-cta"
-                            class="font-ui text-[9px] font-semibold uppercase tracking-[0.12em] text-primary"
-                        >
-                            "Sign in or sign up"
-                        </span>
-                        <span
-                            aria-hidden="true"
-                            class="sync-offer-rule h-px w-5 bg-primary/45"
-                        ></span>
+                        "Sign in or sign up"
                     </span>
                 </button>
 

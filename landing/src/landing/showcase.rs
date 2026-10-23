@@ -57,17 +57,19 @@ pub async fn showcase() -> Result<impl View> {
                 </p>
             </div>
 
-            <div class="rounded-xl bg-surface-container-lowest shadow-2xl p-2 sm:p-4">
+            <div
+                class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest p-2 shadow-sm sm:p-4"
+            >
                 <div
                     class="flex items-center justify-between px-3.5 py-2.5 bg-surface/90 border-b border-surface-container-high/60 rounded-t-lg select-none"
                 >
                     <div class="flex items-center gap-space-md">
-                        <div class="flex items-center gap-1.5">
-                            <div class="w-3 h-3 rounded-full bg-[#ec6a5e] shadow-inner"></div>
-                            <div class="w-3 h-3 rounded-full bg-[#f4bf4f] shadow-inner"></div>
-                            <div class="w-3 h-3 rounded-full bg-[#62c554] shadow-inner"></div>
-                        </div>
-                        <div class="flex items-center gap-space-sm pl-space-xs">
+                        <span
+                            class="font-ui-caption text-[9px] uppercase tracking-[0.14em] text-on-surface-variant/55"
+                        >
+                            "Local journal"
+                        </span>
+                        <div class="flex items-center gap-space-sm">
                             <img
                                 alt="Dainiki logo"
                                 class="h-6 w-6 rounded object-contain"
@@ -81,12 +83,6 @@ pub async fn showcase() -> Result<impl View> {
                         </div>
                     </div>
                     <div class="flex items-center gap-space-sm">
-                        <div
-                            class="hidden sm:flex items-center gap-1.5 font-ui-caption text-ui-caption text-on-surface-variant/70"
-                        >
-                            <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
-                            "Local · saved"
-                        </div>
                         <div class="hidden sm:flex items-center">
                             <div
                                 class="pl-2.5 pr-2.5 py-1 text-[11px] bg-surface-container-low rounded-full border border-surface-container text-on-surface-variant/70 w-44 flex items-center justify-between whitespace-nowrap select-none"
@@ -135,7 +131,11 @@ pub async fn showcase() -> Result<impl View> {
                                         </svg>
                                         <span>"Timeline"</span>
                                     </div>
-                                    <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                    <span
+                                        class="font-ui-caption text-[8px] uppercase tracking-[0.14em] text-primary/70"
+                                    >
+                                        "Now"
+                                    </span>
                                 </div>
                                 <div
                                     class="flex items-center justify-between px-space-sm py-1 rounded text-on-surface-variant hover:bg-surface-container-high text-xs transition-colors"
@@ -171,11 +171,6 @@ pub async fn showcase() -> Result<impl View> {
                                         class="font-ui-caption text-ui-caption uppercase tracking-wider font-semibold text-[10px]"
                                     >
                                         "Tags"
-                                    </span>
-                                    <span
-                                        class="font-ui-caption text-ui-caption text-on-surface-variant/70"
-                                    >
-                                        "+"
                                     </span>
                                 </div>
                                 <nav class="space-y-0.5">
@@ -238,7 +233,7 @@ pub async fn showcase() -> Result<impl View> {
                                         <span
                                             class=(class!(
                                                 "text-on-surface-variant" if day != 20,
-                                                "font-semibold text-primary relative after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:rounded-full after:bg-primary" if day
+                                                "font-semibold text-primary relative after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-3 after:h-px after:bg-primary" if day
                                                     == 20,
                                             ))
                                         >
@@ -263,9 +258,9 @@ pub async fn showcase() -> Result<impl View> {
                                 </span>
                             </div>
                             <div
-                                class="flex items-center gap-1.5 px-space-xs text-on-surface-variant/60"
+                                class="flex items-center gap-2 px-space-xs text-on-surface-variant/60"
                             >
-                                <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                <span class="h-px w-4 bg-primary/40"></span>
                                 <span class="font-ui-caption text-ui-caption text-[10px]">
                                     "Stored on this device"
                                 </span>
@@ -298,17 +293,9 @@ pub async fn showcase() -> Result<impl View> {
                                 <div
                                     class="relative flex-1 border-l border-outline-variant/25 pl-3 sm:pl-4"
                                 >
-                                    <span
-                                        class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
-                                    ></span>
                                     <div
                                         class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-4 sm:p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)]"
                                     >
-                                        <h3
-                                            class="font-headline-md text-headline-md text-on-surface tracking-tight font-normal mb-3"
-                                        >
-                                            "The slow return of morning fog"
-                                        </h3>
                                         <div
                                             class="space-y-space-sm font-journal-body text-[0.95rem] text-on-surface leading-relaxed"
                                         >
@@ -359,17 +346,9 @@ pub async fn showcase() -> Result<impl View> {
                                 <div
                                     class="relative flex-1 border-l border-outline-variant/25 pl-3 sm:pl-4"
                                 >
-                                    <span
-                                        class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
-                                    ></span>
                                     <div
                                         class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-4 sm:p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)]"
                                     >
-                                        <h3
-                                            class="font-headline-md text-headline-md text-on-surface tracking-tight font-normal mb-3"
-                                        >
-                                            "A small room for attention"
-                                        </h3>
                                         <div
                                             class="space-y-space-sm font-journal-body text-[0.95rem] text-on-surface leading-relaxed"
                                         >
@@ -413,9 +392,6 @@ pub async fn showcase() -> Result<impl View> {
                                 <div
                                     class="relative flex-1 border-l border-outline-variant/25 pl-3 sm:pl-4"
                                 >
-                                    <span
-                                        class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
-                                    ></span>
                                     <div
                                         class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-4 sm:p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)]"
                                     >

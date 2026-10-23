@@ -14,7 +14,6 @@ async fn main() {
     let router = Router::builder()
         .layout(landing::root_layout)
         .page(landing::home)
-        .page(landing::app_placeholder)
         .route(waitlist::join)
         .assets(AssetBundle::load().unwrap())
         .font(landing::INTER)

@@ -11,16 +11,15 @@ pub mod showcase;
 use topcoat::{
     Result,
     asset::asset,
-    context::Cx,
     font::{Font, font},
-    router::{Slot, layout, page, query_params},
+    router::{Slot, layout, page},
     view::{View, view},
 };
 
 const SITE_ORIGIN: &str = "https://dainiki.smbl.dev";
 
-const OG_TITLE: &str = "Dainiki: a quiet, text-only journal";
-const OG_DESCRIPTION: &str = "A private, local-first, text-only daily journal for the web. Plain Markdown, a calm timeline, tags, search, and a calendar. No account needed. Optional encrypted sync.";
+const OG_TITLE: &str = "Dainiki — a quiet place to keep your days.";
+const OG_DESCRIPTION: &str = "A private, local-first, text-only daily journal for the web. Plain Markdown, a calm timeline, tags, search, and a calendar. Yours without an account. Optional end-to-end encrypted sync.";
 const OG_IMAGE: &str = "https://dainiki.smbl.dev/og.png";
 
 pub const INTER: Font = font! {
@@ -33,42 +32,6 @@ pub const INTER: Font = font! {
             font-display: swap;
     }
 };
-
-#[derive(Clone, Copy)]
-pub enum WaitlistStatus {
-    Joined,
-    Duplicate,
-    Invalid,
-    Error,
-}
-
-impl WaitlistStatus {
-    fn from_code(code: &str) -> Option<Self> {
-        match code {
-            "joined" => Some(Self::Joined),
-            "duplicate" => Some(Self::Duplicate),
-            "invalid" => Some(Self::Invalid),
-            "error" => Some(Self::Error),
-            _ => None,
-        }
-    }
-
-    pub fn message(self) -> &'static str {
-        match self {
-            Self::Joined => "You're on the list. We'll write when the journal opens.",
-            Self::Duplicate => "You're already on the list.",
-            Self::Invalid => "That email doesn't look right. Try again.",
-            Self::Error => "Something went wrong. Try again in a moment.",
-        }
-    }
-
-    pub fn tone_class(self) -> &'static str {
-        match self {
-            Self::Joined | Self::Duplicate => "text-primary",
-            Self::Invalid | Self::Error => "text-error",
-        }
-    }
-}
 
 pub const NEWSREADER: Font = font! {
     "Newsreader",
@@ -117,12 +80,16 @@ pub async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
                 <meta property="og:image:height" content="630">
                 <meta
                     property="og:image:alt"
-                    content="Dainiki: a quiet, text-only journal"
+                    content="Dainiki — a quiet place to keep your days."
                 >
                 <meta name="twitter:card" content="summary_large_image">
                 <meta name="twitter:title" content=(OG_TITLE)>
                 <meta name="twitter:description" content=(OG_DESCRIPTION)>
                 <meta name="twitter:image" content=(OG_IMAGE)>
+                <meta
+                    name="twitter:image:alt"
+                    content="Dainiki — a quiet place to keep your days."
+                >
 
                 topcoat::font::link(font: INTER)
                 topcoat::font::link(font: NEWSREADER)
@@ -139,23 +106,13 @@ pub async fn root_layout(slot: Slot<'_>) -> Result<impl View> {
     })
 }
 
-#[topcoat::router::query_params(error = bad_request)]
-pub struct HomeQuery {
-    pub joined: Option<String>,
-}
-
 #[page("/")]
-pub async fn home(cx: &Cx) -> Result<impl View> {
-    let status = query_params::<HomeQuery>(cx)?
-        .joined
-        .as_deref()
-        .and_then(WaitlistStatus::from_code);
-
+pub async fn home() -> Result<impl View> {
     Ok(view! {
         <div class="flex flex-col w-full">
             header::header()
             <main class="w-full">
-                hero::hero(status: status)
+                hero::hero()
                 showcase::showcase()
                 features::features()
                 markdown::markdown()
@@ -168,46 +125,3 @@ pub async fn home(cx: &Cx) -> Result<impl View> {
     })
 }
 
-#[page("/app")]
-pub async fn app_placeholder() -> Result<impl View> {
-    Ok(view! {
-        <div class="flex flex-col w-full">
-            header::header()
-            <main class="min-h-[70vh] pt-32 pb-24 px-6">
-                <div class="max-w-xl mx-auto text-center space-y-6">
-                    <span
-                        class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-ui-caption text-ui-caption uppercase tracking-wide"
-                    >
-                        <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
-                        "In development"
-                    </span>
-                    <h1 class="font-headline-lg text-headline-lg text-on-surface">
-                        "The journal is being built."
-                    </h1>
-                    <p
-                        class="font-journal-body-lg text-journal-body-lg text-on-surface-variant leading-relaxed"
-                    >
-                        "The local-first editor, timeline, tags, calendar, search, and paid sync checkout are next. This page will become your writing surface."
-                    </p>
-                    <div
-                        class="flex flex-col sm:flex-row items-center justify-center gap-3"
-                    >
-                        <a
-                            href="/"
-                            class="inline-flex items-center justify-center px-5 py-2.5 rounded bg-primary text-on-primary font-ui-label text-ui-label hover:bg-primary-container hover:text-on-primary-container transition-all"
-                        >
-                            "Back to the landing page"
-                        </a>
-                        <a
-                            href="https://github.com/MrSheerluck/smbl-dainiki"
-                            class="inline-flex items-center justify-center px-5 py-2.5 rounded border border-outline-variant text-on-surface font-ui-label text-ui-label hover:bg-surface-container transition-all"
-                        >
-                            "Follow the build"
-                        </a>
-                    </div>
-                </div>
-            </main>
-            footer::footer()
-        </div>
-    })
-}

@@ -770,128 +770,57 @@ html[data-zen="true"] #active-filter {
   }
 }
 
-/* Paid sync offer in the sidebar. It is the only conversion surface in the
-   app, so it gets a paper-card treatment and a clear next action without
-   competing with the journal itself. */
+/* The sync offer is a quiet sidebar note, not a promotional card. */
 button.sync-offer {
   position: relative;
-  overflow: hidden;
-  border-color: color-mix(
-    in oklab,
-    var(--color-primary) 30%,
-    var(--color-outline-variant)
-  );
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--color-primary) 8%, var(--color-surface-container-lowest))
-        0%,
-      var(--color-surface-container-lowest) 58%,
-      color-mix(in oklab, var(--color-secondary) 5%, var(--color-surface-container-lowest))
-        100%
-    );
-  box-shadow: 0 16px 34px -30px
-    color-mix(in oklab, var(--color-on-surface) 42%, transparent);
+  border: 0;
+  border-top: 1px solid
+    color-mix(in oklab, var(--color-primary) 22%, var(--color-outline-variant));
+  background: transparent;
   transition:
-    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 220ms ease,
-    box-shadow 240ms ease,
-    background-color 220ms ease;
-}
-
-button.sync-offer::before {
-  content: "";
-  position: absolute;
-  top: 0.75rem;
-  bottom: 0.75rem;
-  left: 0;
-  width: 2px;
-  border-radius: 0 2px 2px 0;
-  background: var(--color-secondary);
-  opacity: 0.55;
+    background-color 180ms ease,
+    border-color 180ms ease;
 }
 
 button.sync-offer:hover {
-  border-color: color-mix(in oklab, var(--color-primary) 52%, var(--color-outline-variant));
-  box-shadow: 0 22px 40px -28px
-    color-mix(in oklab, var(--color-on-surface) 46%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-surface-container) 35%,
+    transparent
+  );
+  border-top-color: color-mix(
+    in oklab,
+    var(--color-primary) 42%,
+    var(--color-outline-variant)
+  );
 }
 
 button.sync-offer:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 65%, transparent);
   outline-offset: 2px;
 }
 
 button.sync-offer[data-sync-state="setup"] {
-  border-color: color-mix(
+  border-top-color: color-mix(
     in oklab,
-    var(--color-secondary) 42%,
+    var(--color-secondary) 38%,
     var(--color-outline-variant)
   );
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--color-secondary) 8%, var(--color-surface-container-lowest))
-        0%,
-      var(--color-surface-container-lowest) 62%,
-      color-mix(in oklab, var(--color-primary) 5%, var(--color-surface-container-lowest))
-        100%
-    );
 }
 
-button.sync-offer[data-sync-state="on"],
-button.sync-offer[data-sync-state="busy"] {
-  border-color: color-mix(in oklab, var(--color-primary) 45%, var(--color-outline-variant));
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--color-primary) 12%, var(--color-surface-container-lowest))
-        0%,
-      var(--color-surface-container-lowest) 64%,
-      color-mix(in oklab, var(--color-primary) 4%, var(--color-surface-container-lowest))
-        100%
-    );
-}
-
-button.sync-offer[data-sync-state="on"]::before,
-button.sync-offer[data-sync-state="busy"]::before {
-  background: var(--color-primary);
-}
-
-button.sync-offer[data-sync-state="setup"]::before {
-  background: var(--color-secondary);
-}
-
-button.sync-offer[data-sync-state="setup"] .sync-offer-rule {
-  background: color-mix(in oklab, var(--color-secondary) 55%, transparent);
-}
-
-.sync-offer-arrow {
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-button.sync-offer[data-sync-state="setup"] #sync-cta,
-button.sync-offer[data-sync-state="setup"] .sync-offer-arrow {
+button.sync-offer[data-sync-state="setup"] #sync-cta {
   color: var(--color-secondary);
-}
-
-button.sync-offer[data-sync-state="on"] #sync-cta,
-button.sync-offer[data-sync-state="on"] .sync-offer-arrow,
-button.sync-offer[data-sync-state="busy"] #sync-cta,
-button.sync-offer[data-sync-state="busy"] .sync-offer-arrow {
-  color: var(--color-primary);
+  text-decoration-color: color-mix(
+    in oklab,
+    var(--color-secondary) 35%,
+    transparent
+  );
 }
 
 button.sync-offer[data-sync-state="off"] #sync-label {
   color: var(--color-primary);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  button.sync-offer:hover {
-    transform: translateY(-2px);
-  }
-
-  button.sync-offer:hover .sync-offer-arrow {
-    transform: translate(2px, -2px);
-  }
+button.sync-offer[data-sync-state="off"] #sync-cta {
+  color: var(--color-primary);
 }

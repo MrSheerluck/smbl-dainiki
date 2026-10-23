@@ -18,7 +18,6 @@ const bundleDir = join(landingDir, "target", "release", "assets");
 const binary = join(landingDir, "target", "release", "dainiki-landing");
 const port = process.env.EXPORT_PORT ?? "3971";
 const base = `http://127.0.0.1:${port}`;
-const placeholder = "<!--WAITLIST_STATUS-->";
 
 async function waitForServer(timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
@@ -46,13 +45,6 @@ function rewriteAssetPaths(html) {
     );
 }
 
-function insertStatusPlaceholder(html) {
-  const formEnd = html.indexOf("</form>");
-  if (formEnd === -1) throw new Error("could not find the waitlist form");
-  const insertAt = formEnd + "</form>".length;
-  return `${html.slice(0, insertAt)}\n${placeholder}\n${html.slice(insertAt)}`;
-}
-
 await access(binary).catch(() => {
   throw new Error(`missing release binary: ${binary}. Run cargo build --release first.`);
 });
@@ -77,7 +69,6 @@ try {
   await waitForServer();
 
   const home = await (await fetch(base)).text();
-  const appPage = await (await fetch(`${base}/app`)).text();
 
   const fontUrls = [
     ...new Set(
@@ -108,11 +99,9 @@ try {
     );
   }
 
-  const homePage = rewriteAssetPaths(insertStatusPlaceholder(home));
-  const appHtml = rewriteAssetPaths(appPage);
+  const homePage = rewriteAssetPaths(home);
 
   await writeFile(join(publicDir, "index.html"), homePage, "utf8");
-  await writeFile(join(publicDir, "app.html"), appHtml, "utf8");
   await cp(join(landingDir, "src/landing/img/og.png"), join(publicDir, "og.png"));
 
   await writeFile(
@@ -126,31 +115,19 @@ try {
   Cache-Control: public, max-age=86400
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
-/app.html
-  Cache-Control: public, max-age=0, must-revalidate
 `,
     "utf8",
   );
 
-  for (const file of ["index.html", "app.html"]) {
-    const text = await (await import("node:fs/promises")).readFile(
-      join(publicDir, file),
-      "utf8",
-    );
-    if (text.includes("/_topcoat/")) {
-      throw new Error(`${file} still contains Topcoat asset paths`);
-    }
-    if (text.includes("127.0.0.1")) {
-      throw new Error(`${file} still contains a localhost URL`);
-    }
+  if (homePage.includes("/_topcoat/")) {
+    throw new Error("index.html still contains Topcoat asset paths");
   }
-
-  if (!homePage.includes(placeholder)) {
-    throw new Error("waitlist status placeholder was not inserted");
+  if (homePage.includes("127.0.0.1")) {
+    throw new Error("index.html still contains a localhost URL");
   }
 
   console.log(
-    `exported ${publicDir}: index.html, app.html, ${fontUrls.length} font stylesheet(s), ${(await readdir(join(publicDir, "assets"))).length} asset(s)`,
+    `exported ${publicDir}: index.html, ${fontUrls.length} font stylesheet(s), ${(await readdir(join(publicDir, "assets"))).length} asset(s)`,
   );
 } finally {
   app.kill();

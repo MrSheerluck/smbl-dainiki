@@ -60,12 +60,6 @@ pub async fn header() -> Result<impl View> {
                     </a>
                     <a
                         class="font-ui-body text-ui-body text-on-surface-variant hover:text-on-surface transition-colors"
-                        href="#waitlist"
-                    >
-                        "Waitlist"
-                    </a>
-                    <a
-                        class="font-ui-body text-ui-body text-on-surface-variant hover:text-on-surface transition-colors"
                         href="https://github.com/MrSheerluck/smbl-dainiki"
                         rel="noopener"
                         target="_blank"
@@ -116,10 +110,10 @@ pub async fn header() -> Result<impl View> {
                         </svg>
                     </button>
                     <a
-                        class="hidden sm:inline-flex items-center px-4 py-2 rounded border border-outline-variant text-on-surface font-ui-label text-ui-label hover:bg-surface-container transition-all"
-                        href="#waitlist"
+                        class="hidden sm:inline-flex items-center px-4 py-2 rounded bg-primary text-on-primary font-ui-label text-ui-label hover:bg-primary-container hover:text-on-primary-container transition-colors"
+                        href="https://app.dainiki.smbl.dev/"
                     >
-                        "Join the waitlist"
+                        "Open journal"
                     </a>
                 </div>
             </div>

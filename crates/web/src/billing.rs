@@ -309,6 +309,18 @@ pub async fn billing_portal(cx: &Cx, Form(input): Form<PortalForm>) -> Result<im
     }
 
     let pool = app_context::<PgPool>(cx);
+    if !auth::rate_limit_allows(pool, &format!("portal:user:{}", user.id), 10, 3600).await? {
+        let status = billing_status(pool, user.id).await?;
+        return billing_view(
+            cx,
+            user,
+            None,
+            Some("Too many billing portal requests. Try again later.".to_string()),
+            status.plan.unwrap_or_else(|| "monthly".to_string()),
+        )
+        .await;
+    }
+
     let status = billing_status(pool, user.id).await?;
 
     if dodo::mode() == BillingMode::Mock {

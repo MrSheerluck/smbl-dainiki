@@ -113,12 +113,15 @@ manual sign-off:
 - Ten local end-to-end browser tests covering storage, editing, search, themes,
   conflicts, import/export, offline mode, and mobile.
 
-Accounts and auth are in progress: email/password signup, Argon2id hashing,
-Postgres-backed sessions, email verification, password reset, signin, signout,
-CSRF-protected account actions, rate limits, audit logging, and account
-password change/deletion are working. Billing and encrypted sync come next.
+Accounts, auth, and billing are in progress: email/password signup, Argon2id
+hashing, Postgres-backed sessions, email verification, password reset, signin,
+signout, CSRF-protected account actions, rate limits, audit logging, account
+settings, and Dodo subscription checkout/webhooks are working. Encrypted sync
+comes next.
 
-Next: finish auth polish and billing, then encrypted sync.
+Local billing runs in mock mode by default. Real checkout uses Dodo test or live
+mode with two subscription products and a webhook endpoint. No free trial; the
+plans are $2/month and $20/year.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root

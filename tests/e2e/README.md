@@ -12,24 +12,25 @@ docker compose up -d db
 
 ## Run
 
-Start the app from the repo root:
+Start the app from the repo root. Billing tests use mock mode and a local
+webhook secret:
 
 ```sh
 wasm-pack build crates/client --target web --out-dir ../../web/client/pkg
+BILLING_MODE=mock \
+DODO_PAYMENTS_WEBHOOK_KEY=whsec_d2hvb2stc2VjcmV0 \
 topcoat dev -p dainiki-web
 ```
 
 In another terminal:
 
 ```sh
+DAINIKI_WEBHOOK_SECRET=whsec_d2hvb2stc2VjcmV0 \
 python3 -m unittest discover -s tests/e2e -p 'test_*.py' -v
 ```
 
-Override the URL with:
-
-```sh
-DAINIKI_URL=http://127.0.0.1:3000 python3 -m unittest discover -s tests/e2e -p 'test_*.py' -v
-```
+Override the URL with `DAINIKI_URL`. The webhook test is skipped when
+`DAINIKI_WEBHOOK_SECRET` is unset.
 
 ## Coverage
 
@@ -51,6 +52,18 @@ Accounts (`test_auth.py`):
 - plan-gated signup, account page, session cookie flags
 - signout, anonymous redirect, failed signin, successful signin
 - password mismatch and duplicate email errors
+- email verification, password reset, email change, password change, deletion
+- CSRF rejection for account actions
 
-Each journal test uses a fresh browser context, so OPFS starts empty. Auth tests
-create a unique account per run; the local Postgres volume keeps those rows.
+Billing (`test_billing.py`):
+
+- anonymous `/billing` redirects to `/signup`
+- mock checkout activates a plan and shows it on the account page
+- unverified accounts cannot subscribe
+- checkout requires CSRF
+- signed subscription webhook updates state, duplicates are idempotent, and bad
+  signatures are rejected
+
+Each journal test uses a fresh browser context, so OPFS starts empty. Auth and
+billing tests create a unique account per run; the local Postgres volume keeps
+those rows. Clean test accounts before manual testing if desired.

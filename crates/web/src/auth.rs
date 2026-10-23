@@ -2412,7 +2412,7 @@ fn account_view(
                 <p
                     class="mt-6 text-center font-ui text-[10px] text-on-surface-variant/60"
                 >
-                    "Encrypted sync is not connected yet."
+                    "Encrypted sync is not connected on this device yet."
                 </p>
             </div>
         </main>

@@ -57,11 +57,11 @@
   --text-headline-md--line-height: 2rem;
   --text-headline-md--letter-spacing: -0.01em;
 
-  --text-journal-lg: 1.1875rem;
-  --text-journal-lg--line-height: 1.9375rem;
+  --text-journal-lg: 1.25rem;
+  --text-journal-lg--line-height: 2rem;
 
-  --text-journal: 0.95rem;
-  --text-journal--line-height: 1.625rem;
+  --text-journal: 1.0625rem;
+  --text-journal--line-height: 1.875rem;
 
   --text-ui-body: 0.8125rem;
   --text-ui-body--line-height: 1.25rem;
@@ -272,21 +272,21 @@ html[data-theme="dark"] .theme-icon-moon {
 .live-editor {
   color: var(--color-on-surface);
   font-family: var(--font-journal);
-  font-size: 0.95rem;
-  line-height: 1.625rem;
+  font-size: 1.0625rem;
+  line-height: 1.875rem;
   outline: none;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
 .live-editor .line {
-  min-height: 1.625rem;
+  min-height: 1.875rem;
   outline: none;
 }
 
 .live-editor .line.line-empty:not(.active) {
-  min-height: 0.5rem;
-  line-height: 0.5rem;
+  min-height: 0.625rem;
+  line-height: 0.625rem;
 }
 
 .live-editor .marker {
@@ -314,25 +314,25 @@ html[data-theme="dark"] .theme-icon-moon {
 }
 
 .live-editor .md-h1 {
-  font-size: 1.5rem;
-  line-height: 2rem;
-  letter-spacing: -0.01em;
+  font-size: 1.75rem;
+  line-height: 2.2rem;
+  letter-spacing: -0.015em;
 }
 
 .live-editor .md-h2 {
-  font-size: 1.3rem;
-  line-height: 1.85rem;
+  font-size: 1.45rem;
+  line-height: 2rem;
 }
 
 .live-editor .md-h3 {
-  font-size: 1.15rem;
-  line-height: 1.7rem;
+  font-size: 1.2rem;
+  line-height: 1.8rem;
 }
 
 .live-editor .md-h4,
 .live-editor .md-h5,
 .live-editor .md-h6 {
-  font-size: 1.05rem;
+  font-size: 1.1rem;
 }
 
 .live-editor .md-strong {

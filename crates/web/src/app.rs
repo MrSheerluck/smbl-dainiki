@@ -19,7 +19,7 @@ pub async fn timeline() -> Result<impl View> {
                 <main
                     class="flex-1 px-4 py-10 sm:px-6 sm:py-12 lg:min-h-0 lg:overflow-y-auto lg:px-10"
                 >
-                    <div class="mx-auto max-w-[44rem] space-y-7">
+                    <div class="mx-auto max-w-5xl space-y-8">
                         today_entry()
                         <div
                             id="active-filter"
@@ -277,36 +277,36 @@ pub async fn search_overlay() -> Result<impl View> {
 #[component]
 pub async fn today_entry() -> Result<impl View> {
     Ok(view! {
-        <article class="flex gap-3 sm:gap-4">
-            <div class="w-11 shrink-0 pt-1 text-right sm:w-14">
+        <article class="flex gap-3 sm:gap-5">
+            <div class="w-14 shrink-0 pt-1 text-right sm:w-20">
                 <span
                     id="today-day"
-                    class="block font-display text-[1.9rem] leading-none text-on-surface/70 sm:text-[2.2rem]"
+                    class="block font-display text-[2.4rem] leading-none text-on-surface/70 sm:text-[3rem]"
                 >
                     "22"
                 </span>
                 <span
                     id="today-weekday"
-                    class="mt-1 block whitespace-nowrap font-ui text-[8px] uppercase tracking-wide text-on-surface-variant/70 sm:text-[9px]"
+                    class="mt-1 block whitespace-nowrap font-ui text-[9px] uppercase tracking-wide text-on-surface-variant/70 sm:text-[10px]"
                 >
                     "Today"
                 </span>
                 <span
                     id="today-month"
-                    class="mt-0.5 block font-ui text-[8px] text-on-surface-variant/50 sm:text-[9px]"
+                    class="mt-0.5 block font-ui text-[9px] text-on-surface-variant/50 sm:text-[10px]"
                 >
                     "Oct 2026"
                 </span>
             </div>
 
             <div
-                class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-3 sm:pl-4"
+                class="relative min-w-0 flex-1 border-l border-outline-variant/25 pl-4 sm:pl-5"
             >
                 <span
                     class="absolute -left-1 top-7 h-1.5 w-1.5 rounded-full bg-outline-variant"
                 ></span>
                 <div
-                    class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-4 shadow-[0_1px_3px_rgba(44,42,41,0.04)] sm:p-5"
+                    class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)] sm:p-6"
                 >
                     <div class="mb-4 flex items-center justify-end gap-2">
                         <button
@@ -337,7 +337,7 @@ pub async fn today_entry() -> Result<impl View> {
 
                     <div
                         id="entry-editor"
-                        class="live-editor min-h-[11rem] w-full font-journal text-journal text-on-surface"
+                        class="live-editor min-h-[14rem] w-full font-journal text-journal text-on-surface sm:min-h-[20rem]"
                         contenteditable="true"
                         spellcheck="true"
                         role="textbox"

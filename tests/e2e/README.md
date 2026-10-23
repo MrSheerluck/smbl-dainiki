@@ -55,6 +55,14 @@ Accounts (`test_auth.py`):
 - email verification, password reset, email change, password change, deletion
 - CSRF rejection for account actions
 
+Encrypted sync (`test_sync.py`):
+
+- sync requires an active plan
+- passphrase setup, two-device download, lock/unlock
+- conflict copies with the remote version canonical
+- encrypted deletion/tombstone propagation
+- recent-first download (30 entries) and explicit Download all
+
 Billing (`test_billing.py`):
 
 - anonymous `/billing` redirects to `/signup`
@@ -64,6 +72,10 @@ Billing (`test_billing.py`):
 - signed subscription webhook updates state, duplicates are idempotent, and bad
   signatures are rejected
 
-Each journal test uses a fresh browser context, so OPFS starts empty. Auth and
-billing tests create a unique account per run; the local Postgres volume keeps
-those rows. Clean test accounts before manual testing if desired.
+Each journal/sync test uses a fresh browser context, so OPFS starts empty. Auth,
+billing, and sync tests create a unique account per run; the local Postgres
+volume keeps those rows and RustFS keeps encrypted objects. Clean test accounts
+before manual testing if desired.
+
+The sync tests require RustFS on `127.0.0.1:9000` with the `dainiki-sync` bucket
+and CORS for `http://127.0.0.1:3001`. `storage-init` creates both.

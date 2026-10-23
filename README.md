@@ -34,10 +34,11 @@ Open <http://127.0.0.1:3000>.
 The journal app lives in `crates/web`. Build the Rust/WASM client first, then
 run the Topcoat server from the repo root:
 
-Start Postgres first, then build the client and run the server:
+Start Postgres and the local S3-compatible object store first, then build the
+client and run the server:
 
 ```sh
-docker compose up -d db
+docker compose up -d db rustfs storage-init
 wasm-pack build crates/client --target web --out-dir ../../web/client/pkg
 topcoat dev -p dainiki-web
 ```
@@ -103,11 +104,22 @@ The app automatically switches to them when
 The live webhook URL must be the deployed app's public
 `/api/billing/webhook` endpoint.
 
-Run the browser suites with the server running:
+Run the browser suites against a mock-billing server with file email:
 
 ```sh
-python3 -m unittest discover -s tests/e2e -p 'test_*.py' -v
+PORT=3001 APP_BASE_URL=http://127.0.0.1:3001 \
+  AUTH_EMAIL_MODE=file BILLING_MODE=mock \
+  DODO_PAYMENTS_WEBHOOK_KEY=whsec_d2hvb2stc2VjcmV0 \
+  topcoat dev -p dainiki-web
+
+DAINIKI_URL=http://127.0.0.1:3001 \
+  DAINIKI_WEBHOOK_SECRET=whsec_d2hvb2stc2VjcmV0 \
+  python3 -m unittest discover -s tests/e2e -p 'test_*.py' -v
 ```
+
+Sync tests create a paid mock account, set a sync passphrase, exercise two
+devices, verify conflict copies and tombstones, and check recent-first download
+limits. They require the local RustFS bucket and its CORS rule.
 
 The full app and database can also run in Docker:
 
@@ -115,10 +127,11 @@ The full app and database can also run in Docker:
 docker compose --profile full up -d --build
 ```
 
-This builds the WASM client, the Topcoat server, and a Postgres 17 database.
-The app is at <http://127.0.0.1:3000>; `/api/health` and `/api/ready` are
-available for container checks. Local verification mail is stored in the
-`dainiki-outbox` volume.
+This builds the WASM client, the Topcoat server, a Postgres 17 database, and a
+local RustFS object store. The app is at <http://127.0.0.1:3000>; `/api/health`
+and `/api/ready` are available for container checks. Local verification mail is
+stored in the `dainiki-outbox` volume. The RustFS console is at
+<http://127.0.0.1:9001>.
 
 ## Status
 
@@ -142,14 +155,20 @@ manual sign-off:
 - Installable PWA with an offline app shell.
 - Incremental timeline pagination and a mobile sidebar drawer.
 - First-run onboarding with a persistent-storage request.
-- Ten local end-to-end browser tests covering storage, editing, search, themes,
+- Ten local journal browser tests covering storage, editing, search, themes,
   conflicts, import/export, offline mode, and mobile.
 
-Accounts, auth, and billing are in progress: email/password signup, Argon2id
-hashing, Postgres-backed sessions, email verification, password reset, signin,
-signout, CSRF-protected account actions, rate limits, audit logging, account
-settings, and Dodo subscription checkout/webhooks are working. Encrypted sync
-comes next.
+Accounts, auth, billing, and encrypted sync are working: email/password signup,
+Argon2id hashing, Postgres-backed sessions, email verification, password reset,
+CSRF-protected account actions, rate limits, audit logging, account settings,
+and Dodo subscription checkout/webhooks. Sync derives an Argon2id key from a
+separate passphrase, wraps the master key with a one-time recovery key, encrypts
+every manifest and entry with XChaCha20-Poly1305, and stores only ciphertext in
+S3-compatible object storage. Presigned URLs keep entry bytes off the app
+server. The client syncs recent entries first (30 by default), supports an
+explicit “Download all entries” action, detects conflicts with base hashes and
+writes local `.conflict-<timestamp>.md` copies, and propagates encrypted entry
+deletions as tombstones. The full suite has 28 browser tests.
 
 Local billing runs in mock mode by default. Real checkout uses Dodo test or live
 mode with two subscription products and a webhook endpoint. No free trial; the

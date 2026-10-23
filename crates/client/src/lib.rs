@@ -94,6 +94,8 @@ struct State {
     sync_message: Option<String>,
     sync_busy: bool,
     sync_auto_timeout: Option<Timeout>,
+    sync_missing: usize,
+    sync_download_all: bool,
 }
 
 type SharedState = Rc<RefCell<State>>;
@@ -184,6 +186,8 @@ pub fn start() -> Result<(), JsValue> {
         sync_message: None,
         sync_busy: false,
         sync_auto_timeout: None,
+        sync_missing: 0,
+        sync_download_all: false,
     }));
 
     init_theme(&document)?;
@@ -1093,6 +1097,10 @@ fn handle_sync_action(state: SharedState, document: &Document, event: Event) {
             spawn_result(unlock_recovery_sync(state, recovery));
         }
         "sync-now" => spawn_result(run_sync(state)),
+        "sync-all" => {
+            state.borrow_mut().sync_download_all = true;
+            spawn_result(run_sync(state));
+        }
         "lock" => lock_sync(state),
         _ => {}
     }
@@ -1152,6 +1160,8 @@ async fn setup_sync(
         state.sync_master_key = Some(keys.master_key);
         state.sync_recovery = Some(keys.recovery_key);
         state.sync_base = load_sync_base();
+        state.sync_missing = 0;
+        state.sync_download_all = false;
         if let Some(status) = &mut state.sync_status {
             status.linked = true;
         }
@@ -1197,6 +1207,8 @@ async fn unlock_sync(state: SharedState, passphrase: String) -> Result<(), JsVal
         state.sync_master_key = Some(master);
         state.sync_recovery = None;
         state.sync_base = load_sync_base();
+        state.sync_missing = 0;
+        state.sync_download_all = false;
     }
 
     render_sync_panel(state.clone());
@@ -1235,6 +1247,8 @@ async fn unlock_recovery_sync(state: SharedState, recovery: String) -> Result<()
         state.sync_master_key = Some(master);
         state.sync_recovery = None;
         state.sync_base = load_sync_base();
+        state.sync_missing = 0;
+        state.sync_download_all = false;
     }
 
     render_sync_panel(state.clone());
@@ -1247,6 +1261,8 @@ fn lock_sync(state: SharedState) {
         let mut state = state.borrow_mut();
         state.sync_master_key = None;
         state.sync_recovery = None;
+        state.sync_missing = 0;
+        state.sync_download_all = false;
         state.sync_message = Some(if recovery {
             "Sync locked. Make sure you saved the recovery key before closing.".to_string()
         } else {
@@ -1508,13 +1524,17 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
         }
     }
 
-    let remote_only: Vec<String> = manifest_entries
+    let mut remote_only: Vec<String> = manifest_entries
         .iter()
         .filter(|(iso, entry)| !entry.deleted && !local.contains_key(*iso))
         .map(|(iso, _)| iso.clone())
         .collect();
+    remote_only.sort_by(|left, right| right.cmp(left));
 
-    for iso in remote_only {
+    let download_all = state.borrow().sync_download_all;
+    let limit = if download_all { usize::MAX } else { 30 };
+
+    for iso in remote_only.into_iter().take(limit) {
         download_entry(&key, &iso, &mut local, &mut manifest_entries).await?;
         downloaded += 1;
     }
@@ -1557,7 +1577,20 @@ async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String,
         return Err("The remote journal kept changing. Try again.".to_string());
     }
 
-    state.borrow_mut().sync_base = Some(updated.clone());
+    let missing = updated
+        .entries
+        .iter()
+        .filter(|entry| !entry.deleted && !local.contains_key(&entry.date))
+        .count();
+
+    {
+        let mut state = state.borrow_mut();
+        state.sync_base = Some(updated.clone());
+        state.sync_missing = missing;
+        if missing == 0 {
+            state.sync_download_all = false;
+        }
+    }
     save_sync_base(&updated);
     refresh(state.clone()).await.map_err(js_message)?;
     if reload_editor {
@@ -1733,6 +1766,16 @@ fn sync_panel_html(state: &State) -> String {
             status.entry_count,
             format_bytes(status.usage_bytes)
         ));
+
+        if state.sync_missing > 0 {
+            html.push_str(&format!(
+                r#"<div class="mt-3 rounded border border-outline-variant/40 bg-surface-container/60 px-3 py-2">
+<p class="font-ui text-ui-label text-on-surface-variant">{} older entries are not downloaded on this device yet.</p>
+<button type="button" data-sync-action="sync-all" class="mt-2 rounded border border-outline-variant/60 px-3 py-1.5 font-ui text-ui-label text-on-surface hover:bg-surface-container">Download all entries</button>
+</div>"#,
+                state.sync_missing
+            ));
+        }
 
         if let Some(recovery) = &state.sync_recovery {
             html.push_str(&format!(

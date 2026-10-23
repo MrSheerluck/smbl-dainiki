@@ -2,6 +2,7 @@ import os
 import re
 import time
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -271,6 +272,40 @@ class DainikiSyncE2E(unittest.TestCase):
         self.click_sync_now(self.page)
         self.assertEqual(self.page.locator("#entry-editor").inner_text().strip(), "")
         self.assertNotIn("shared baseline", self.page.locator("#timeline-entries").inner_text())
+
+    def test_recent_first_download_and_download_all(self):
+        email = self.email()
+        self.activate(self.page, email)
+        self.open_journal(self.page)
+        today = date.today()
+        entries = [
+            {
+                "iso": (today - timedelta(days=offset)).isoformat(),
+                "text": f"recent-first entry {offset}",
+            }
+            for offset in range(35)
+        ]
+        self.seed(self.page, entries)
+        self.assertIn("Synced 35 up", self.setup_sync(self.page))
+
+        device_two = self.new_page()
+        self.signin(device_two, email)
+        self.open_journal(device_two)
+        self.assertIn("30 down", self.unlock_sync(device_two))
+        panel = device_two.locator("#sync-content").inner_text()
+        self.assertIn("5 older entries are not downloaded", panel)
+        self.assertIn("Download all entries", panel)
+        self.assertEqual(len(self.local_files(device_two)), 30)
+
+        device_two.click('[data-sync-action="sync-all"]')
+        self.wait_for_sync(device_two)
+        device_two.wait_for_timeout(1000)
+        self.assertNotIn(
+            "older entries are not downloaded",
+            device_two.locator("#sync-content").inner_text(),
+        )
+        self.assertEqual(len(self.local_files(device_two)), 35)
+
 
 
 if __name__ == "__main__":

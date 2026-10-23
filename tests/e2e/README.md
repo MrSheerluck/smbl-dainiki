@@ -7,30 +7,36 @@ Browser tests use Python Playwright. No Node or `node_modules` are required.
 ```sh
 python3 -m pip install playwright
 python3 -m playwright install chromium
-docker compose up -d db
+docker compose up -d db rustfs storage-init
 ```
 
 ## Run
 
-Start the app from the repo root. Billing tests use mock mode and a local
-webhook secret:
+Start a mock-billing test server on port 3001 from the repo root:
 
 ```sh
 wasm-pack build crates/client --target web --out-dir ../../web/client/pkg
-BILLING_MODE=mock \
-DODO_PAYMENTS_WEBHOOK_KEY=whsec_d2hvb2stc2VjcmV0 \
-topcoat dev -p dainiki-web
+PORT=3001 APP_BASE_URL=http://127.0.0.1:3001 \
+  AUTH_EMAIL_MODE=file BILLING_MODE=mock \
+  DODO_PAYMENTS_WEBHOOK_KEY=whsec_d2hvb2stc2VjcmV0 \
+  topcoat dev -p dainiki-web
 ```
 
 In another terminal:
 
 ```sh
-DAINIKI_WEBHOOK_SECRET=whsec_d2hvb2stc2VjcmV0 \
-python3 -m unittest discover -s tests/e2e -p 'test_*.py' -v
+DAINIKI_URL=http://127.0.0.1:3001 \
+  DAINIKI_WEBHOOK_SECRET=whsec_d2hvb2stc2VjcmV0 \
+  python3 -m unittest discover -s tests/e2e -p 'test_*.py' -v
 ```
 
 Override the URL with `DAINIKI_URL`. The webhook test is skipped when
 `DAINIKI_WEBHOOK_SECRET` is unset.
+
+The sync tests need RustFS on `127.0.0.1:9000` with the private
+`dainiki-sync` bucket and CORS for `http://127.0.0.1:3001`. `storage-init`
+creates both. Do not run code edits while the suite is running; `topcoat dev`
+may rebuild and briefly drop the port.
 
 ## Coverage
 

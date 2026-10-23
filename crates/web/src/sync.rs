@@ -216,7 +216,7 @@ pub async fn get_sync_keys(cx: &Cx) -> Result<Json<SyncKeyResponse>> {
 pub async fn get_manifest(cx: &Cx) -> Result<Json<ObjectUrl>> {
     let user = active_user(cx).await?;
     let storage = require_storage(cx)?;
-    rate_limit(cx, user.id, "manifest-read", 300).await?;
+    rate_limit(cx, user.id, "manifest-read", 600).await?;
     let pool = app_context::<PgPool>(cx);
     let row: Option<(i64, String, i64, String, i64)> = sqlx::query_as(
         "SELECT revision, content_hash, size, object_key, updated_at
@@ -248,7 +248,7 @@ pub async fn get_manifest(cx: &Cx) -> Result<Json<ObjectUrl>> {
 pub async fn put_manifest(cx: &Cx, body: Bytes) -> Result<Json<ManifestWriteResponse>> {
     let user = active_user(cx).await?;
     let storage = require_storage(cx)?;
-    rate_limit(cx, user.id, "manifest-write", 120).await?;
+    rate_limit(cx, user.id, "manifest-write", 600).await?;
     let base = *path_param::<BaseRevision>(cx)?;
     let base = i64::max(0, base);
 
@@ -327,7 +327,7 @@ pub async fn put_manifest(cx: &Cx, body: Bytes) -> Result<Json<ManifestWriteResp
 pub async fn get_entry(cx: &Cx) -> Result<Json<ObjectUrl>> {
     let user = active_user(cx).await?;
     let storage = require_storage(cx)?;
-    rate_limit(cx, user.id, "entry-read", 600).await?;
+    rate_limit(cx, user.id, "entry-read", 10_000).await?;
     let entry_id = path_param::<EntryId>(cx).to_string();
     validate_entry_id(&entry_id)?;
 
@@ -368,7 +368,7 @@ pub async fn prepare_entry_upload(
 ) -> Result<Json<PreparedUpload>> {
     let user = active_user(cx).await?;
     let storage = require_storage(cx)?;
-    rate_limit(cx, user.id, "entry-prepare", 120).await?;
+    rate_limit(cx, user.id, "entry-prepare", 3_000).await?;
     validate_entry_id(&input.entry_id)?;
     validate_hash(&input.hash)?;
 
@@ -465,7 +465,7 @@ pub async fn commit_entry_upload(
 ) -> Result<Json<SyncWriteResponse>> {
     let user = active_user(cx).await?;
     let storage = require_storage(cx)?;
-    rate_limit(cx, user.id, "entry-commit", 120).await?;
+    rate_limit(cx, user.id, "entry-commit", 3_000).await?;
     let pool = app_context::<PgPool>(cx);
     let now = now_seconds();
     let mut tx = pool.begin().await?;
@@ -578,7 +578,7 @@ pub async fn delete_entry(
 ) -> Result<Json<SyncWriteResponse>> {
     let user = active_user(cx).await?;
     let storage = require_storage(cx)?;
-    rate_limit(cx, user.id, "entry-delete", 120).await?;
+    rate_limit(cx, user.id, "entry-delete", 600).await?;
     validate_entry_id(&input.entry_id)?;
 
     if input.base_revision < 0 {

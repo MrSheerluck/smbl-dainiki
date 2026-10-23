@@ -3483,8 +3483,11 @@ async fn finish_inline_edit(state: SharedState, save: bool) -> Result<(), JsValu
         return Ok(());
     }
 
-    if save && !save_inline(state.clone()).await? {
-        return Ok(());
+    if save {
+        state.borrow_mut().inline_save_timeout = None;
+        if !save_inline(state.clone()).await? {
+            return Ok(());
+        }
     }
 
     let (container, link) = {

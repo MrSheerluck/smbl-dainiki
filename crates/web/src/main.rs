@@ -2,6 +2,7 @@ mod app;
 mod auth;
 mod db;
 mod layout;
+mod mail;
 mod typography;
 
 use topcoat::{
@@ -30,7 +31,15 @@ async fn main() {
         .page(auth::signup)
         .page(auth::signin_page)
         .page(auth::signin)
+        .page(auth::verify_email)
+        .page(auth::resend_verification)
+        .page(auth::forgot_password_page)
+        .page(auth::forgot_password)
+        .page(auth::reset_password_page)
+        .page(auth::reset_password)
         .page(auth::account)
+        .page(auth::change_password)
+        .page(auth::delete_account)
         .route(auth::signout)
         .public_dir("web/client")
         .assets(AssetBundle::load().unwrap())

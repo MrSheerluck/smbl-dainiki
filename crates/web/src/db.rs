@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use topcoat::Result;
@@ -15,6 +15,23 @@ pub async fn connect() -> Result<PgPool> {
         .await?;
 
     sqlx::migrate!("./migrations").run(&pool).await?;
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or_default();
+    sqlx::query("DELETE FROM sessions WHERE expires_at <= $1")
+        .bind(now)
+        .execute(&pool)
+        .await?;
+    sqlx::query("DELETE FROM auth_tokens WHERE expires_at <= $1")
+        .bind(now)
+        .execute(&pool)
+        .await?;
+    sqlx::query("DELETE FROM rate_limits WHERE window_start < $1")
+        .bind(now - 86_400)
+        .execute(&pool)
+        .await?;
 
     Ok(pool)
 }

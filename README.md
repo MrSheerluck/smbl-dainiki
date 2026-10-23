@@ -50,6 +50,11 @@ a `.env` file when needed; `.env.example` has the defaults. Sqlx migrations run
 when the server starts. The app remains usable without an account; auth pages
 live at `/signup` and `/signin`.
 
+In local development, verification and reset emails are written to
+`data/outbox/` by default. Set `AUTH_EMAIL_MODE=log` to print them instead, or
+`AUTH_EMAIL_MODE=resend` with `RESEND_API_KEY` for real delivery. Production
+defaults to Resend when `APP_BASE_URL` uses `https://`.
+
 Run the browser suites with the server running:
 
 ```sh
@@ -82,11 +87,11 @@ manual sign-off:
   conflicts, import/export, offline mode, and mobile.
 
 Accounts and auth are in progress: email/password signup, Argon2id hashing,
-Postgres-backed sessions, signin, signout, and an account page are working.
-Email verification, password reset, CSRF hardening, rate limiting, and billing
-come next, followed by encrypted sync.
+Postgres-backed sessions, email verification, password reset, signin, signout,
+CSRF-protected account actions, rate limits, audit logging, and account
+password change/deletion are working. Billing and encrypted sync come next.
 
-Next: finish auth, then encrypted sync and billing.
+Next: finish auth polish and billing, then encrypted sync.
 
 The working plan, progress tracker, and code map live in `docs/` and are
 intentionally ignored by Git. Only this README is tracked from the project root

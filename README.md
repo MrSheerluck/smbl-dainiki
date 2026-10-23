@@ -13,9 +13,22 @@ Optional end-to-end encrypted sync is available as a paid subscription.
 - **Markdown files**: `YYYY/MM/YYYY-MM-DD.md`, readable in Obsidian, Git, or
   any text editor.
 - **No account for local use**: accounts exist only for paid sync.
-- **Open source**: MIT licensed.
+- **Open source**: AGPL-3.0 licensed.
 - **Self-hostable**: with built-in email/password auth, SMTP/Resend, and
   optional Cloudflare R2 storage.
+
+## Deploy on Railway
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/dainiki-1?utm_medium=integration&utm_source=button&utm_campaign=dainiki&referralCode=07teCa)
+
+One click provisions the app and a Postgres database on
+[Railway](https://railway.com/deploy/dainiki-1). The journal itself still lives
+in the browser; Postgres is only used for accounts and optional encrypted sync.
+This is a Railway referral link: new accounts get $20 in credits, and Dainiki
+earns a commission at no extra cost to you. New to Railway? [Sign up with the
+referral link](https://railway.com/?referralCode=07teCa) first, then use the
+button above. See [`deploy/railway.md`](deploy/railway.md) for post-deploy setup
+and template maintenance.
 
 ## Landing page
 
@@ -215,4 +228,4 @@ documentation.
 
 ## License
 
-MIT
+AGPL-3.0. See [`LICENSE`](LICENSE).

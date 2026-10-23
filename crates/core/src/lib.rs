@@ -1,5 +1,7 @@
 use time::{Month, Weekday, macros::format_description};
 
+pub mod sync_crypto;
+
 pub use time::Date;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

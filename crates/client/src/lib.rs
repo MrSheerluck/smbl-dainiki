@@ -1,15 +1,25 @@
 mod markdown;
 mod opfs;
 mod render;
+mod sync;
 
 use std::{
     cell::RefCell,
+    collections::HashMap,
     future::Future,
     io::{Cursor, Read, Write},
     rc::Rc,
 };
 
-use dainiki_core::{month_year, parse_date, parse_entry, weekday_name};
+use dainiki_core::{
+    month_year, parse_date, parse_entry,
+    sync_crypto::{
+        ManifestEntry, SyncManifest, bytes_hash, content_hash, create_sync_keys, decrypt_entry,
+        decrypt_manifest, encrypt_entry, encrypt_manifest, unlock_with_passphrase,
+        unlock_with_recovery_key,
+    },
+    weekday_name,
+};
 use gloo_timers::callback::Timeout;
 use js_sys::Uint8Array;
 use render::EntryRecord;
@@ -73,6 +83,17 @@ struct State {
     next_day_button: Element,
     save_timeout: Option<Timeout>,
     history_timeout: Option<Timeout>,
+    sync_overlay: Element,
+    sync_content: Element,
+    sync_status: Option<sync::SyncStatus>,
+    sync_signed_out: bool,
+    sync_keys: Option<sync::SyncKeys>,
+    sync_master_key: Option<[u8; 32]>,
+    sync_recovery: Option<String>,
+    sync_base: Option<SyncManifest>,
+    sync_message: Option<String>,
+    sync_busy: bool,
+    sync_auto_timeout: Option<Timeout>,
 }
 
 type SharedState = Rc<RefCell<State>>;
@@ -152,6 +173,17 @@ pub fn start() -> Result<(), JsValue> {
         next_day_button: element(&document, "#next-day")?,
         save_timeout: None,
         history_timeout: None,
+        sync_overlay: element(&document, "#sync-overlay")?,
+        sync_content: element(&document, "#sync-content")?,
+        sync_status: None,
+        sync_signed_out: false,
+        sync_keys: None,
+        sync_master_key: None,
+        sync_recovery: None,
+        sync_base: None,
+        sync_message: None,
+        sync_busy: false,
+        sync_auto_timeout: None,
     }));
 
     init_theme(&document)?;
@@ -646,6 +678,49 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
+    let open_sync_state = state.clone();
+    listen(
+        element(document, "#open-sync")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            open_sync(open_sync_state.clone());
+        }),
+    )?;
+
+    let close_sync_state = state.clone();
+    listen(
+        element(document, "#close-sync")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            close_sync(close_sync_state.clone());
+        }),
+    )?;
+
+    let sync_backdrop_state = state.clone();
+    listen(
+        state.borrow().sync_overlay.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            let Some(target) = target_element(&event) else {
+                return;
+            };
+
+            if target.id() == "sync-overlay" {
+                close_sync(sync_backdrop_state.clone());
+            }
+        }),
+    )?;
+
+    let sync_action_state = state.clone();
+    let sync_action_document = document.clone();
+    listen(
+        state.borrow().sync_content.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_sync_action(sync_action_state.clone(), &sync_action_document, event);
+        }),
+    )?;
+
     let open_data_state = state.clone();
     listen(
         element(document, "#open-data")?.as_ref(),
@@ -931,6 +1006,714 @@ fn close_data(state: SharedState) {
         .data_overlay
         .set_attribute("hidden", "true")
         .ok();
+}
+
+fn open_sync(state: SharedState) {
+    state
+        .borrow()
+        .sync_overlay
+        .remove_attribute("hidden")
+        .ok();
+    render_sync_panel(state.clone());
+    spawn_result(load_sync_status(state));
+}
+
+fn close_sync(state: SharedState) {
+    state
+        .borrow()
+        .sync_overlay
+        .set_attribute("hidden", "true")
+        .ok();
+}
+
+async fn load_sync_status(state: SharedState) -> Result<(), JsValue> {
+    match sync::fetch_status().await {
+        Ok(status) => {
+            let linked = status.linked;
+            {
+                let mut state = state.borrow_mut();
+                state.sync_status = Some(status);
+                state.sync_signed_out = false;
+            }
+
+            if linked && state.borrow().sync_keys.is_none() {
+                if let Ok(keys) = sync::fetch_keys().await {
+                    state.borrow_mut().sync_keys = Some(keys);
+                }
+            }
+        }
+        Err(sync::SyncError::Unauthorized) => {
+            let mut state = state.borrow_mut();
+            state.sync_status = None;
+            state.sync_signed_out = true;
+            state.sync_keys = None;
+            state.sync_master_key = None;
+        }
+        Err(error) => {
+            state.borrow_mut().sync_message = Some(error.message());
+        }
+    }
+
+    render_sync_panel(state);
+    Ok(())
+}
+
+fn handle_sync_action(state: SharedState, document: &Document, event: Event) {
+    let Some(target) = target_element(&event) else {
+        return;
+    };
+    let Ok(Some(button)) = target.closest("[data-sync-action]") else {
+        return;
+    };
+    let Some(action) = button.get_attribute("data-sync-action") else {
+        return;
+    };
+
+    match action.as_str() {
+        "setup" => {
+            let passphrase = input_value(document, "#sync-passphrase");
+            let confirm = input_value(document, "#sync-confirm");
+            spawn_result(setup_sync(state, passphrase, confirm));
+        }
+        "unlock" => {
+            let passphrase = input_value(document, "#sync-passphrase");
+            spawn_result(unlock_sync(state, passphrase));
+        }
+        "unlock-recovery" => {
+            let recovery = input_value(document, "#sync-recovery-input");
+            spawn_result(unlock_recovery_sync(state, recovery));
+        }
+        "sync-now" => spawn_result(run_sync(state)),
+        "lock" => lock_sync(state),
+        _ => {}
+    }
+}
+
+async fn setup_sync(
+    state: SharedState,
+    passphrase: String,
+    confirm: String,
+) -> Result<(), JsValue> {
+    if passphrase.chars().count() < 12 {
+        set_sync_message(&state, "Use at least 12 characters for the sync passphrase.");
+        render_sync_panel(state);
+        return Ok(());
+    }
+
+    if passphrase != confirm {
+        set_sync_message(&state, "Those sync passphrases do not match.");
+        render_sync_panel(state);
+        return Ok(());
+    }
+
+    state.borrow_mut().sync_busy = true;
+    set_sync_message(&state, "Deriving your encryption key…");
+    render_sync_panel(state.clone());
+
+    let keys = match create_sync_keys(&passphrase) {
+        Ok(keys) => keys,
+        Err(error) => {
+            state.borrow_mut().sync_busy = false;
+            set_sync_message(&state, &error.to_string());
+            render_sync_panel(state);
+            return Ok(());
+        }
+    };
+
+    let response = match sync::create_keys(
+        &keys.salt,
+        &keys.wrapped_key,
+        &keys.recovery_wrapped_key,
+    )
+    .await
+    {
+        Ok(response) => response,
+        Err(error) => {
+            state.borrow_mut().sync_busy = false;
+            set_sync_message(&state, &error.message());
+            render_sync_panel(state);
+            return Ok(());
+        }
+    };
+
+    {
+        let mut state = state.borrow_mut();
+        state.sync_busy = false;
+        state.sync_keys = Some(response);
+        state.sync_master_key = Some(keys.master_key);
+        state.sync_recovery = Some(keys.recovery_key);
+        state.sync_base = load_sync_base();
+        if let Some(status) = &mut state.sync_status {
+            status.linked = true;
+        }
+    }
+
+    set_sync_message(
+        &state,
+        "Sync key created. Save the recovery key below, then run a sync.",
+    );
+    render_sync_panel(state);
+    Ok(())
+}
+
+async fn unlock_sync(state: SharedState, passphrase: String) -> Result<(), JsValue> {
+    state.borrow_mut().sync_busy = true;
+    set_sync_message(&state, "Unlocking encrypted sync…");
+    render_sync_panel(state.clone());
+
+    let keys = match sync_keys(&state).await {
+        Ok(keys) => keys,
+        Err(message) => {
+            state.borrow_mut().sync_busy = false;
+            set_sync_message(&state, &message);
+            render_sync_panel(state);
+            return Ok(());
+        }
+    };
+
+    let master = match unlock_with_passphrase(&passphrase, &keys.salt, &keys.wrapped_key) {
+        Ok(master) => master,
+        Err(_) => {
+            state.borrow_mut().sync_busy = false;
+            set_sync_message(&state, "That sync passphrase is incorrect.");
+            render_sync_panel(state);
+            return Ok(());
+        }
+    };
+
+    {
+        let mut state = state.borrow_mut();
+        state.sync_busy = false;
+        state.sync_keys = Some(keys);
+        state.sync_master_key = Some(master);
+        state.sync_recovery = None;
+        state.sync_base = load_sync_base();
+    }
+
+    render_sync_panel(state.clone());
+    run_sync(state).await
+}
+
+async fn unlock_recovery_sync(state: SharedState, recovery: String) -> Result<(), JsValue> {
+    state.borrow_mut().sync_busy = true;
+    set_sync_message(&state, "Unlocking encrypted sync…");
+    render_sync_panel(state.clone());
+
+    let keys = match sync_keys(&state).await {
+        Ok(keys) => keys,
+        Err(message) => {
+            state.borrow_mut().sync_busy = false;
+            set_sync_message(&state, &message);
+            render_sync_panel(state);
+            return Ok(());
+        }
+    };
+
+    let master = match unlock_with_recovery_key(&recovery, &keys.recovery_wrapped_key) {
+        Ok(master) => master,
+        Err(_) => {
+            state.borrow_mut().sync_busy = false;
+            set_sync_message(&state, "That recovery key is not valid.");
+            render_sync_panel(state);
+            return Ok(());
+        }
+    };
+
+    {
+        let mut state = state.borrow_mut();
+        state.sync_busy = false;
+        state.sync_keys = Some(keys);
+        state.sync_master_key = Some(master);
+        state.sync_recovery = None;
+        state.sync_base = load_sync_base();
+    }
+
+    render_sync_panel(state.clone());
+    run_sync(state).await
+}
+
+fn lock_sync(state: SharedState) {
+    let recovery = state.borrow().sync_recovery.is_some();
+    {
+        let mut state = state.borrow_mut();
+        state.sync_master_key = None;
+        state.sync_recovery = None;
+        state.sync_message = Some(if recovery {
+            "Sync locked. Make sure you saved the recovery key before closing.".to_string()
+        } else {
+            "Sync locked on this device.".to_string()
+        });
+    }
+    render_sync_panel(state);
+}
+
+async fn sync_keys(state: &SharedState) -> Result<sync::SyncKeys, String> {
+    if let Some(keys) = state.borrow().sync_keys.clone() {
+        return Ok(keys);
+    }
+
+    let keys = sync::fetch_keys().await.map_err(|error| error.message())?;
+    state.borrow_mut().sync_keys = Some(keys.clone());
+    Ok(keys)
+}
+
+async fn run_sync(state: SharedState) -> Result<(), JsValue> {
+    run_sync_mode(state, true).await
+}
+
+async fn run_sync_mode(state: SharedState, reload_editor: bool) -> Result<(), JsValue> {
+    if state.borrow().sync_master_key.is_none() || state.borrow().sync_busy {
+        return Ok(());
+    }
+
+    state.borrow_mut().sync_busy = true;
+    set_sync_message(&state, "Syncing encrypted entries…");
+    render_sync_panel(state.clone());
+
+    let result = perform_sync(state.clone(), reload_editor).await;
+
+    {
+        let mut state = state.borrow_mut();
+        state.sync_busy = false;
+        state.sync_message = Some(match &result {
+            Ok(message) => message.clone(),
+            Err(message) => message.clone(),
+        });
+    }
+
+    if let Ok(status) = sync::fetch_status().await {
+        state.borrow_mut().sync_status = Some(status);
+    }
+    render_sync_panel(state);
+    Ok(())
+}
+
+async fn perform_sync(state: SharedState, reload_editor: bool) -> Result<String, String> {
+    if state.borrow().inline_iso.is_some() {
+        finish_inline_edit(state.clone(), true)
+            .await
+            .map_err(js_message)?;
+    }
+    save_entry(state.clone()).await.map_err(js_message)?;
+
+    let key = state
+        .borrow()
+        .sync_master_key
+        .ok_or_else(|| "Sync is locked.".to_string())?;
+    let local_pairs = opfs::list_entries().await.map_err(js_message)?;
+    let mut local: HashMap<String, String> = local_pairs.into_iter().collect();
+
+    let remote = sync::fetch_manifest().await.map_err(|error| error.message())?;
+    let remote_revision = remote.as_ref().map(|manifest| manifest.revision).unwrap_or(0);
+    let mut manifest = match &remote {
+        Some(remote) => decrypt_manifest(&key, &remote.bytes).map_err(|error| error.to_string())?,
+        None => SyncManifest {
+            version: 1,
+            updated_at: 0,
+            entries: Vec::new(),
+        },
+    };
+    let mut manifest_entries: HashMap<String, ManifestEntry> = manifest
+        .entries
+        .drain(..)
+        .map(|entry| (entry.date.clone(), entry))
+        .collect();
+    let base = state
+        .borrow()
+        .sync_base
+        .clone()
+        .or_else(load_sync_base);
+    let base_entries: HashMap<String, ManifestEntry> = base
+        .as_ref()
+        .map(|manifest| {
+            manifest
+                .entries
+                .iter()
+                .cloned()
+                .map(|entry| (entry.date.clone(), entry))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let mut dates: Vec<String> = local.keys().cloned().collect();
+    dates.sort();
+
+    let mut uploaded = 0usize;
+    let mut downloaded = 0usize;
+    let mut conflicts = 0usize;
+
+    for iso in dates {
+        let text = local.get(&iso).cloned().unwrap_or_default();
+        let local_hash = content_hash(&text);
+        let remote_entry = manifest_entries.get(&iso).cloned();
+
+        let action = match &remote_entry {
+            None => "upload",
+            Some(remote_entry) if remote_entry.hash == local_hash => "keep",
+            Some(remote_entry) => {
+                let base_hash = base_entries.get(&iso).map(|entry| entry.hash.as_str());
+
+                if base_hash == Some(local_hash.as_str()) {
+                    "download"
+                } else if base_hash == Some(remote_entry.hash.as_str()) {
+                    "upload"
+                } else {
+                    "conflict"
+                }
+            }
+        };
+
+        match action {
+            "upload" => {
+                let base_revision = remote_entry.map(|entry| entry.revision).unwrap_or(0);
+                let encrypted = encrypt_entry(&key, &iso, &text)
+                    .map_err(|error| error.to_string())?;
+
+                match sync::put_entry(&iso, base_revision, encrypted, &local_hash).await {
+                    Ok(write) => {
+                        manifest_entries.insert(
+                            iso.clone(),
+                            ManifestEntry {
+                                date: iso.clone(),
+                                hash: write.hash,
+                                size: write.size as u64,
+                                revision: write.revision,
+                            },
+                        );
+                        uploaded += 1;
+                    }
+                    Err(sync::SyncError::Conflict) => {
+                        conflicts += 1;
+                        handle_remote_conflict(&state, &key, &iso, &text, &mut manifest_entries)
+                            .await?;
+                    }
+                    Err(error) => return Err(error.message()),
+                }
+            }
+            "download" => {
+                download_entry(&key, &iso, &mut local, &mut manifest_entries).await?;
+                downloaded += 1;
+            }
+            "conflict" => {
+                let conflict = opfs::write_conflict(&iso, &text)
+                    .await
+                    .map_err(js_message)?;
+                let _ = conflict;
+                conflicts += 1;
+                download_entry(&key, &iso, &mut local, &mut manifest_entries).await?;
+                downloaded += 1;
+            }
+            _ => {}
+        }
+    }
+
+    let remote_only: Vec<String> = manifest_entries
+        .keys()
+        .filter(|iso| !local.contains_key(*iso))
+        .cloned()
+        .collect();
+
+    for iso in remote_only {
+        download_entry(&key, &iso, &mut local, &mut manifest_entries).await?;
+        downloaded += 1;
+    }
+
+    let mut entries: Vec<ManifestEntry> = manifest_entries.into_values().collect();
+    entries.sort_by(|left, right| left.date.cmp(&right.date));
+    let mut updated = SyncManifest {
+        version: 1,
+        updated_at: (js_sys::Date::now() / 1000.0) as i64,
+        entries,
+    };
+    let mut base_revision = remote_revision;
+    let mut saved = false;
+
+    for _ in 0..3 {
+        let encrypted =
+            encrypt_manifest(&key, &updated).map_err(|error| error.to_string())?;
+        let hash = bytes_hash(&encrypted);
+
+        match sync::put_manifest(base_revision, encrypted, &hash).await {
+            Ok(_) => {
+                saved = true;
+                break;
+            }
+            Err(sync::SyncError::Conflict) => {
+                let Some(latest) = sync::fetch_manifest().await.map_err(|error| error.message())?
+                else {
+                    return Err("The remote manifest disappeared during sync.".to_string());
+                };
+                base_revision = latest.revision;
+                let latest = decrypt_manifest(&key, &latest.bytes)
+                    .map_err(|error| error.to_string())?;
+                updated = merge_manifests(&latest, &updated);
+            }
+            Err(error) => return Err(error.message()),
+        }
+    }
+
+    if !saved {
+        return Err("The remote journal kept changing. Try again.".to_string());
+    }
+
+    state.borrow_mut().sync_base = Some(updated.clone());
+    save_sync_base(&updated);
+    refresh(state.clone()).await.map_err(js_message)?;
+    if reload_editor {
+        let selected = state.borrow().selected_iso.clone();
+        load_entry(state.clone(), &selected).await.map_err(js_message)?;
+    }
+
+    let mut message = format!("Synced {uploaded} up, {downloaded} down.");
+    if conflicts > 0 {
+        message.push_str(&format!(" {conflicts} conflict copies saved."));
+    }
+
+    Ok(message)
+}
+
+fn merge_manifests(latest: &SyncManifest, ours: &SyncManifest) -> SyncManifest {
+    let mut entries: HashMap<String, ManifestEntry> = latest
+        .entries
+        .iter()
+        .cloned()
+        .map(|entry| (entry.date.clone(), entry))
+        .collect();
+
+    for entry in &ours.entries {
+        let replace = entries
+            .get(&entry.date)
+            .map(|remote| entry.revision >= remote.revision)
+            .unwrap_or(true);
+
+        if replace {
+            entries.insert(entry.date.clone(), entry.clone());
+        }
+    }
+
+    let mut entries: Vec<ManifestEntry> = entries.into_values().collect();
+    entries.sort_by(|left, right| left.date.cmp(&right.date));
+
+    SyncManifest {
+        version: 1,
+        updated_at: (js_sys::Date::now() / 1000.0) as i64,
+        entries,
+    }
+}
+
+async fn download_entry(
+    key: &[u8; 32],
+    iso: &str,
+    local: &mut HashMap<String, String>,
+    manifest_entries: &mut HashMap<String, ManifestEntry>,
+) -> Result<(), String> {
+    let Some(remote) = sync::get_entry(iso).await.map_err(|error| error.message())? else {
+        return Ok(());
+    };
+    let text = decrypt_entry(key, iso, &remote.bytes).map_err(|error| error.to_string())?;
+    opfs::write_entry(iso, &text).await.map_err(js_message)?;
+    local.insert(iso.to_string(), text);
+
+    if let Some(entry) = manifest_entries.get_mut(iso) {
+        entry.revision = remote.revision;
+        entry.hash = remote.hash;
+    }
+
+    Ok(())
+}
+
+async fn handle_remote_conflict(
+    state: &SharedState,
+    key: &[u8; 32],
+    iso: &str,
+    local_text: &str,
+    manifest_entries: &mut HashMap<String, ManifestEntry>,
+) -> Result<(), String> {
+    opfs::write_conflict(iso, local_text)
+        .await
+        .map_err(js_message)?;
+    let mut local = HashMap::new();
+    download_entry(key, iso, &mut local, manifest_entries).await?;
+    let _ = state;
+    Ok(())
+}
+
+fn render_sync_panel(state: SharedState) {
+    let html = {
+        let state = state.borrow();
+        sync_panel_html(&state)
+    };
+
+    state.borrow().sync_content.set_inner_html(&html);
+}
+
+fn sync_panel_html(state: &State) -> String {
+        let mut html = String::new();
+
+        if let Some(message) = &state.sync_message {
+            html.push_str(&format!(
+                r#"<p class="mb-4 rounded border border-outline-variant/40 bg-surface-container px-3 py-2 font-ui text-ui-label text-on-surface-variant">{}</p>"#,
+                escape_sync(message)
+            ));
+        }
+
+        if state.sync_signed_out {
+            html.push_str(
+                r#"<p class="font-ui text-ui-body text-on-surface-variant">Sign in to enable encrypted sync. Local journaling stays free.</p>
+<div class="mt-4 flex gap-2">
+  <a href="/signin" class="rounded bg-primary px-4 py-2 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">Sign in</a>
+  <a href="/signup" class="rounded border border-outline-variant/60 px-4 py-2 font-ui text-ui-label text-on-surface hover:bg-surface-container">Create an account</a>
+</div>"#,
+            );
+            return html;
+        }
+
+        let Some(status) = &state.sync_status else {
+            html.push_str(r#"<p class="font-ui text-ui-label text-on-surface-variant/60">Loading sync status…</p>"#);
+            return html;
+        };
+
+        if state.sync_busy {
+            html.push_str(r#"<p class="font-ui text-ui-body text-on-surface-variant">Working…</p>"#);
+            return html;
+        }
+
+        if !status.active {
+            html.push_str(
+                r#"<p class="font-ui text-ui-body text-on-surface-variant">Sync needs an active plan. Your local journal is unaffected.</p>
+<a href="/billing" class="mt-4 inline-flex rounded bg-primary px-4 py-2 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">Choose a plan</a>"#,
+            );
+            return html;
+        }
+
+        if !status.linked {
+            html.push_str(
+                r#"<p class="font-ui text-ui-body text-on-surface-variant">Create a sync passphrase. It encrypts your journal on this device and is never sent to the server.</p>
+<div class="mt-4 space-y-3">
+  <label class="block"><span class="font-ui text-ui-label text-on-surface-variant">Sync passphrase</span><input id="sync-passphrase" type="password" minlength="12" autocomplete="new-password" class="mt-1 w-full rounded border border-outline-variant/60 bg-surface px-3 py-2 font-ui text-ui-body text-on-surface outline-none focus:border-primary"></label>
+  <label class="block"><span class="font-ui text-ui-label text-on-surface-variant">Confirm passphrase</span><input id="sync-confirm" type="password" minlength="12" autocomplete="new-password" class="mt-1 w-full rounded border border-outline-variant/60 bg-surface px-3 py-2 font-ui text-ui-body text-on-surface outline-none focus:border-primary"></label>
+  <button type="button" data-sync-action="setup" class="rounded bg-primary px-4 py-2 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">Create sync key</button>
+</div>"#,
+            );
+            return html;
+        }
+
+        if state.sync_master_key.is_none() {
+            html.push_str(
+                r#"<p class="font-ui text-ui-body text-on-surface-variant">Enter your sync passphrase to unlock encrypted sync on this device.</p>
+<div class="mt-4 space-y-3">
+  <label class="block"><span class="font-ui text-ui-label text-on-surface-variant">Sync passphrase</span><input id="sync-passphrase" type="password" autocomplete="current-password" class="mt-1 w-full rounded border border-outline-variant/60 bg-surface px-3 py-2 font-ui text-ui-body text-on-surface outline-none focus:border-primary"></label>
+  <button type="button" data-sync-action="unlock" class="rounded bg-primary px-4 py-2 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">Unlock sync</button>
+</div>
+<details class="mt-4"><summary class="cursor-pointer font-ui text-ui-label text-on-surface-variant">Use recovery key</summary>
+  <div class="mt-3 space-y-3">
+    <input id="sync-recovery-input" type="text" autocomplete="off" placeholder="Recovery key" class="w-full rounded border border-outline-variant/60 bg-surface px-3 py-2 font-mono text-ui-label text-on-surface outline-none focus:border-primary">
+    <button type="button" data-sync-action="unlock-recovery" class="rounded border border-outline-variant/60 px-4 py-2 font-ui text-ui-label text-on-surface hover:bg-surface-container">Unlock with recovery key</button>
+  </div>
+</details>"#,
+            );
+            return html;
+        }
+
+        html.push_str(&format!(
+            r#"<p class="font-ui text-ui-body text-on-surface">Encrypted sync is on.</p>
+<p class="mt-1 font-ui text-ui-label text-on-surface-variant">{} entries · {}</p>"#,
+            status.entry_count,
+            format_bytes(status.usage_bytes)
+        ));
+
+        if let Some(recovery) = &state.sync_recovery {
+            html.push_str(&format!(
+                r#"<div class="mt-4 rounded border border-secondary/40 bg-secondary/5 p-3">
+<p class="font-ui text-ui-label text-on-surface">Save this recovery key now. It will not be shown again.</p>
+<code class="mt-2 block break-all rounded bg-surface px-2 py-2 font-mono text-[10px] text-on-surface">{}</code>
+</div>"#,
+                escape_sync(recovery)
+            ));
+        }
+
+        html.push_str(
+            r#"<div class="mt-5 flex flex-wrap gap-2">
+<button type="button" data-sync-action="sync-now" class="rounded bg-primary px-4 py-2 font-ui text-ui-label text-on-primary hover:bg-primary-container hover:text-on-primary-container">Sync now</button>
+<button type="button" data-sync-action="lock" class="rounded border border-outline-variant/60 px-4 py-2 font-ui text-ui-label text-on-surface hover:bg-surface-container">Lock</button>
+</div>"#,
+        );
+
+        html
+}
+
+fn set_sync_message(state: &SharedState, message: &str) {
+    state.borrow_mut().sync_message = Some(message.to_string());
+}
+
+fn input_value(document: &Document, selector: &str) -> String {
+    document
+        .query_selector(selector)
+        .ok()
+        .flatten()
+        .and_then(|element| element.dyn_into::<HtmlInputElement>().ok())
+        .map(|input| input.value())
+        .unwrap_or_default()
+}
+
+fn load_sync_base() -> Option<SyncManifest> {
+    local_storage()?
+        .get_item("dainiki-sync-base")
+        .ok()
+        .flatten()
+        .and_then(|json| serde_json::from_str(&json).ok())
+}
+
+fn save_sync_base(manifest: &SyncManifest) {
+    if let Some(storage) = local_storage() {
+        if let Ok(json) = serde_json::to_string(manifest) {
+            storage.set_item("dainiki-sync-base", &json).ok();
+        }
+    }
+}
+
+fn format_bytes(bytes: i64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    let bytes = bytes.max(0) as f64;
+
+    if bytes >= GB {
+        format!("{:.2} GB of 1 GB", bytes / GB)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes / MB)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes / KB)
+    } else {
+        format!("{} B", bytes as i64)
+    }
+}
+
+fn js_message(error: JsValue) -> String {
+    error
+        .as_string()
+        .unwrap_or_else(|| "Local storage error.".to_string())
+}
+
+fn escape_sync(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+fn schedule_sync(state: SharedState) {
+    if state.borrow().sync_master_key.is_none() {
+        return;
+    }
+
+    let next_state = state.clone();
+    let mut state = state.borrow_mut();
+    state.sync_auto_timeout = Some(Timeout::new(1500, move || {
+        spawn_result(run_sync_mode(next_state.clone(), false));
+    }));
 }
 
 fn set_data_status(state: &SharedState, text: &str) {
@@ -1754,6 +2537,7 @@ async fn save_entry(state: SharedState) -> Result<(), JsValue> {
             }
             set_status(&state, &format!("Saved locally · {words} words"));
             refresh_if_no_inline(state.clone()).await?;
+            schedule_sync(state.clone());
 
             if markdown::source_from_editor(&editor) != text {
                 schedule_save(state.clone());
@@ -2111,6 +2895,7 @@ async fn save_inline(state: SharedState) -> Result<bool, JsValue> {
             Ok(()) => {
                 state.borrow_mut().inline_base = text;
                 set_inline_status(status.as_ref(), "Saved locally");
+                schedule_sync(state.clone());
                 true
             }
             Err(error) => {

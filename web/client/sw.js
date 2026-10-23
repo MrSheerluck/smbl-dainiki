@@ -1,4 +1,4 @@
-const CACHE = "dainiki-shell-v1";
+const CACHE = "dainiki-shell-v2";
 const SHELL = [
   "/",
   "/loader.js",
@@ -42,45 +42,48 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Only the local journal shell is cached. Account, billing, auth, sync,
+  // and journal API responses must always hit the network.
+  if (url.pathname.startsWith("/api/")) {
+    return;
+  }
+
   if (request.mode === "navigate") {
+    if (url.pathname !== "/") {
+      return;
+    }
+
     event.respondWith(
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          caches.open(CACHE).then((cache) => cache.put("/", copy));
           return response;
         })
-        .catch(() =>
-          caches.match(request).then((cached) => cached || caches.match("/"))
-        )
+        .catch(() => caches.match("/"))
     );
     return;
   }
 
-  if (url.pathname.startsWith("/pkg/") || url.pathname.startsWith("/_topcoat/")) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
+  const cacheable =
+    url.pathname.startsWith("/pkg/") ||
+    url.pathname.startsWith("/_topcoat/") ||
+    url.pathname === "/loader.js" ||
+    url.pathname === "/manifest.webmanifest" ||
+    url.pathname === "/icon-192.png" ||
+    url.pathname === "/icon-512.png";
+
+  if (!cacheable) {
     return;
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-
-      return fetch(request).then((response) => {
+    fetch(request)
+      .then((response) => {
         const copy = response.clone();
         caches.open(CACHE).then((cache) => cache.put(request, copy));
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(request))
   );
 });

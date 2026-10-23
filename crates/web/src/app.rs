@@ -47,6 +47,7 @@ pub async fn timeline() -> Result<impl View> {
             search_overlay()
             data_overlay()
             welcome_overlay()
+            sync_overlay()
         </div>
     })
 }
@@ -95,6 +96,55 @@ pub async fn welcome_overlay() -> Result<impl View> {
                 >
                     "We'll ask the browser to protect this storage."
                 </p>
+            </div>
+        </div>
+    })
+}
+
+#[component]
+pub async fn sync_overlay() -> Result<impl View> {
+    Ok(view! {
+        <div
+            id="sync-overlay"
+            hidden="true"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sync-title"
+            class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-24 backdrop-blur-sm"
+        >
+            <div
+                class="w-full max-w-lg overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+            >
+                <div
+                    class="flex items-center justify-between border-b border-outline-variant/40 px-5 py-3"
+                >
+                    <div>
+                        <p
+                            class="font-ui text-[10px] uppercase tracking-[0.16em] text-primary"
+                        >
+                            "End-to-end encrypted"
+                        </p>
+                        <h2
+                            id="sync-title"
+                            class="font-display text-lg text-on-surface"
+                        >
+                            "Dainiki Sync"
+                        </h2>
+                    </div>
+                    <button
+                        id="close-sync"
+                        type="button"
+                        aria-label="Close sync panel"
+                        class="rounded px-2 py-1 font-ui text-ui-label text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                    >
+                        "×"
+                    </button>
+                </div>
+                <div id="sync-content" class="p-5">
+                    <p class="font-ui text-ui-label text-on-surface-variant/60">
+                        "Loading…"
+                    </p>
+                </div>
             </div>
         </div>
     })
@@ -453,9 +503,10 @@ pub async fn sidebar() -> Result<impl View> {
                     </span>
                 </div>
 
-                <a
-                    href="/billing"
-                    class="flex items-center justify-between px-1 font-ui text-ui-label text-on-surface-variant hover:text-on-surface"
+                <button
+                    id="open-sync"
+                    type="button"
+                    class="flex w-full items-center justify-between px-1 text-left font-ui text-ui-label text-on-surface-variant hover:text-on-surface"
                 >
                     <span class="flex items-center gap-2">
                         <svg
@@ -478,7 +529,7 @@ pub async fn sidebar() -> Result<impl View> {
                     <span class="font-ui text-[10px] text-on-surface-variant/50">
                         "Paid"
                     </span>
-                </a>
+                </button>
 
                 <div class="flex items-center justify-between px-1">
                     <button

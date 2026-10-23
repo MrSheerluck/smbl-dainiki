@@ -6,6 +6,7 @@ mod dodo;
 mod health;
 mod layout;
 mod mail;
+mod sync;
 mod typography;
 
 use topcoat::{
@@ -51,6 +52,13 @@ async fn main() {
         .route(billing::billing_return)
         .page(billing::billing_portal)
         .route(billing::billing_webhook)
+        .route(sync::sync_status)
+        .route(sync::setup_sync_keys)
+        .route(sync::get_sync_keys)
+        .route(sync::get_manifest)
+        .route(sync::put_manifest)
+        .route(sync::get_entry)
+        .route(sync::put_entry)
         .route(health::health)
         .route(health::ready)
         .public_dir("web/client")

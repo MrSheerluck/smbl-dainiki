@@ -42,8 +42,9 @@ pub struct PortalSession {
 
 pub fn mode() -> BillingMode {
     if env::var("BILLING_MODE").as_deref() == Ok("mock") {
-        if app_base_url().starts_with("https://") {
-            eprintln!("[billing] refusing mock billing on an https base URL");
+        let base = app_base_url();
+        if !(base.starts_with("http://127.0.0.1") || base.starts_with("http://localhost")) {
+            eprintln!("[billing] refusing mock billing outside loopback HTTP");
             return BillingMode::Disabled;
         }
 

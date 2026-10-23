@@ -3,9 +3,10 @@ use std::{
     fmt::Write,
 };
 
-use dainiki_core::{Date, EntryMeta, month_short, month_year, weekday_name};
+use dainiki_core::{Date, EntryMeta, month_short, month_year, parse_date, weekday_name};
 use time::Month;
 
+#[derive(Clone)]
 pub struct EntryRecord {
     pub iso: String,
     pub text: String,
@@ -366,6 +367,182 @@ pub fn calendar(
     }
 
     html.push_str("</div>");
+
+    html
+}
+
+pub fn archive(
+    year: i32,
+    month: u32,
+    selected_iso: &str,
+    today_iso: &str,
+    entries: &[EntryRecord],
+) -> String {
+    let Some(month_value) = Month::try_from(month as u8).ok() else {
+        return String::new();
+    };
+    let Some(first) = Date::from_calendar_date(year, month_value, 1).ok() else {
+        return String::new();
+    };
+    let today = parse_date(today_iso);
+    let selected_date = parse_date(selected_iso);
+
+    let mut year_counts: BTreeMap<i32, usize> = BTreeMap::new();
+    let mut month_counts: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut entry_days: BTreeSet<String> = BTreeSet::new();
+
+    for entry in entries {
+        if let Some(date) = parse_date(&entry.iso) {
+            *year_counts.entry(date.year()).or_default() += 1;
+            entry_days.insert(entry.iso.clone());
+
+            if date.year() == year {
+                *month_counts.entry(date.month() as u32).or_default() += 1;
+            }
+        }
+    }
+
+    if let Some(today) = today {
+        year_counts.entry(today.year()).or_default();
+    }
+    if let Some(selected) = selected_date {
+        year_counts.entry(selected.year()).or_default();
+    }
+    year_counts.entry(year).or_default();
+
+    let mut years: Vec<(i32, usize)> = year_counts.into_iter().collect();
+    years.sort_by(|left, right| right.0.cmp(&left.0));
+
+    let offset = first.weekday().number_from_monday() - 1;
+    let mut html = String::new();
+
+    let _ = write!(
+        html,
+        r#"<div class="grid gap-7 sm:grid-cols-[6.5rem_minmax(0,1fr)_14rem] sm:gap-5">
+  <section>
+    <p class="font-ui text-[9px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant/60">Year</p>
+    <div class="mt-2 flex flex-wrap gap-1 sm:block sm:space-y-0.5">"#
+    );
+
+    for (value, count) in years {
+        let selected = value == year;
+        let pressed = if selected { "true" } else { "false" };
+        let class = if selected {
+            "group flex items-baseline justify-between gap-2 rounded px-2 py-1 text-left bg-primary/10 text-primary"
+        } else {
+            "group flex items-baseline justify-between gap-2 rounded px-2 py-1 text-left text-on-surface-variant hover:bg-surface-container"
+        };
+
+        let _ = write!(
+            html,
+            r#"<button type="button" data-archive-year="{value}" aria-pressed="{pressed}" class="{class}">
+  <span class="font-display text-lg leading-none">{value}</span>
+  <span class="font-ui text-[9px] tabular-nums text-on-surface-variant/50">{count}</span>
+</button>"#
+        );
+    }
+
+    html.push_str(
+        r#"</div>
+  </section>
+  <section>
+    <p class="font-ui text-[9px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant/60">Month</p>
+    <div class="mt-2 grid grid-cols-3 gap-1 sm:grid-cols-2">"#,
+    );
+
+    for month_number in 1..=12u32 {
+        let Some(month_value) = Month::try_from(month_number as u8).ok() else {
+            continue;
+        };
+        let selected = month_number == month;
+        let count = month_counts.get(&month_number).copied().unwrap_or(0);
+        let pressed = if selected { "true" } else { "false" };
+        let class = if selected {
+            "flex items-baseline justify-between rounded px-2 py-1.5 bg-primary/10 text-primary"
+        } else {
+            "flex items-baseline justify-between rounded px-2 py-1.5 text-on-surface-variant hover:bg-surface-container"
+        };
+
+        let _ = write!(
+            html,
+            r#"<button type="button" data-archive-month="{month_number}" aria-pressed="{pressed}" class="{class}">
+  <span class="font-ui text-ui-label">{name}</span>
+  <span class="font-ui text-[9px] tabular-nums text-on-surface-variant/45">{count}</span>
+</button>"#,
+            name = month_name(month_value),
+        );
+    }
+
+    let _ = write!(
+        html,
+        r#"</div>
+  </section>
+  <section>
+    <div class="flex items-baseline justify-between gap-2">
+      <p class="font-ui text-[9px] font-semibold uppercase tracking-[0.14em] text-on-surface-variant/60">Day</p>
+      <span class="font-display text-sm text-on-surface-variant">{month} {year}</span>
+    </div>
+    <div class="mt-2 grid grid-cols-7 gap-1 text-center font-ui text-[9px] text-on-surface-variant/60">
+      <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+    </div>
+    <div class="mt-1 grid grid-cols-7 gap-1 text-center font-ui text-[10px]">"#,
+        month = month_name(month_value),
+        year = year,
+    );
+
+    for _ in 0..offset {
+        html.push_str("<span></span>");
+    }
+
+    for day in 1..=31u32 {
+        let Ok(date) = Date::from_calendar_date(year, month_value, day as u8) else {
+            break;
+        };
+
+        let iso = date.to_string();
+        let is_future = iso.as_str() > today_iso;
+        let is_selected = iso == selected_iso;
+        let is_today = iso == today_iso;
+        let has_entry = entry_days.contains(&iso);
+        let mut class = String::from(
+            "relative flex h-7 items-center justify-center rounded transition-colors",
+        );
+
+        if is_future {
+            class.push_str(" cursor-default text-on-surface-variant/25");
+        } else if is_selected {
+            class.push_str(" bg-primary text-on-primary");
+        } else {
+            class.push_str(" text-on-surface-variant hover:bg-surface-container");
+            if is_today {
+                class.push_str(" font-semibold text-primary");
+            }
+        }
+
+        if has_entry && !is_selected {
+            class.push_str(
+                " after:absolute after:bottom-0.5 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-secondary",
+            );
+        }
+
+        let disabled = if is_future { " disabled" } else { "" };
+        let pressed = if is_selected { "true" } else { "false" };
+
+        let _ = write!(
+            html,
+            r#"<button type="button" data-archive-day="{iso}" aria-label="{iso}" aria-pressed="{pressed}" class="{class}"{disabled}>{day}</button>"#
+        );
+    }
+
+    html.push_str(
+        r#"</div>
+  </section>
+</div>
+<div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-surface-container-high/60 pt-3">
+  <button type="button" data-archive-today class="rounded border border-outline-variant/60 px-3 py-1.5 font-ui text-ui-label text-on-surface hover:bg-surface-container">Back to today</button>
+  <button type="button" data-archive-search class="font-ui text-ui-caption text-on-surface-variant/70 underline decoration-outline-variant underline-offset-2 hover:text-on-surface">Search entries</button>
+</div>"#,
+    );
 
     html
 }

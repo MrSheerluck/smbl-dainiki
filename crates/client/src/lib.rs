@@ -23,7 +23,6 @@ use dainiki_core::{
 use gloo_timers::callback::Timeout;
 use js_sys::{Array, Function, Reflect, Uint8Array};
 use render::EntryRecord;
-use time::Duration;
 use wasm_bindgen::{JsCast, JsValue, prelude::*};
 use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::{
@@ -62,6 +61,10 @@ struct State {
     search_selected: usize,
     data_overlay: Element,
     data_status: Element,
+    archive_overlay: Element,
+    archive_content: Element,
+    archive_year: i32,
+    archive_month: u32,
     import_file: HtmlInputElement,
     import_folder: HtmlInputElement,
     inline_iso: Option<String>,
@@ -83,8 +86,7 @@ struct State {
     day_label: Element,
     weekday_label: Element,
     month_label: Element,
-    today_button: Element,
-    next_day_button: Element,
+
     save_timeout: Option<Timeout>,
     history_timeout: Option<Timeout>,
     sync_overlay: Element,
@@ -167,6 +169,10 @@ pub fn start() -> Result<(), JsValue> {
         search_selected: 0,
         data_overlay: element(&document, "#data-overlay")?,
         data_status: element(&document, "#data-status")?,
+        archive_overlay: element(&document, "#archive-overlay")?,
+        archive_content: element(&document, "#archive-content")?,
+        archive_year: calendar_year,
+        archive_month: calendar_month,
         import_file: query::<HtmlInputElement>(&document, "#import-file")?,
         import_folder: query::<HtmlInputElement>(&document, "#import-folder-input")?,
         inline_iso: None,
@@ -188,8 +194,7 @@ pub fn start() -> Result<(), JsValue> {
         day_label: element(&document, "#today-day")?,
         weekday_label: element(&document, "#today-weekday")?,
         month_label: element(&document, "#today-month")?,
-        today_button: element(&document, "#today-button")?,
-        next_day_button: element(&document, "#next-day")?,
+
         save_timeout: None,
         history_timeout: None,
         sync_overlay: element(&document, "#sync-overlay")?,
@@ -630,34 +635,6 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
-    let today_state = state.clone();
-    listen(
-        state.borrow().today_button.as_ref(),
-        "click",
-        Closure::<dyn FnMut(Event)>::new(move |_| {
-            let today = today_state.borrow().today_iso.clone();
-            spawn_result(select_date(today_state.clone(), today));
-        }),
-    )?;
-
-    let previous_state = state.clone();
-    listen(
-        element(document, "#prev-day")?.as_ref(),
-        "click",
-        Closure::<dyn FnMut(Event)>::new(move |_| {
-            shift_date(previous_state.clone(), -1);
-        }),
-    )?;
-
-    let next_state = state.clone();
-    listen(
-        element(document, "#next-day")?.as_ref(),
-        "click",
-        Closure::<dyn FnMut(Event)>::new(move |_| {
-            shift_date(next_state.clone(), 1);
-        }),
-    )?;
-
     let clear_state = state.clone();
     listen(
         element(document, "#clear-filter")?.as_ref(),
@@ -828,6 +805,62 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         "click",
         Closure::<dyn FnMut(Event)>::new(move |event| {
             handle_sync_action(sync_action_state.clone(), &sync_action_document, event);
+        }),
+    )?;
+
+    let open_archive_state = state.clone();
+    listen(
+        element(document, "#open-archive")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            open_archive(open_archive_state.clone());
+        }),
+    )?;
+
+    let close_archive_state = state.clone();
+    listen(
+        element(document, "#close-archive")?.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |_| {
+            close_archive(close_archive_state.clone());
+        }),
+    )?;
+
+    let archive_backdrop_state = state.clone();
+    listen(
+        state.borrow().archive_overlay.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            let Some(target) = target_element(&event) else {
+                return;
+            };
+            if target.id() == "archive-overlay" {
+                close_archive(archive_backdrop_state.clone());
+            }
+        }),
+    )?;
+
+    let archive_action_state = state.clone();
+    listen(
+        state.borrow().archive_content.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_archive_click(archive_action_state.clone(), event);
+        }),
+    )?;
+
+    let archive_key_state = state.clone();
+    listen(
+        state.borrow().archive_overlay.as_ref(),
+        "keydown",
+        Closure::<dyn FnMut(Event)>::new(move |event: Event| {
+            let Ok(event) = event.dyn_into::<KeyboardEvent>() else {
+                return;
+            };
+            if event.key() == "Escape" {
+                event.prevent_default();
+                close_archive(archive_key_state.clone());
+            }
         }),
     )?;
 
@@ -1141,6 +1174,114 @@ fn close_data(state: SharedState) {
         .data_overlay
         .set_attribute("hidden", "true")
         .ok();
+}
+
+fn open_archive(state: SharedState) {
+    let selected = state.borrow().selected_iso.clone();
+    let (year, month) = month_parts(&selected);
+    {
+        let mut state = state.borrow_mut();
+        state.archive_year = year;
+        state.archive_month = month;
+    }
+    render_archive(state.clone());
+    state
+        .borrow()
+        .archive_overlay
+        .remove_attribute("hidden")
+        .ok();
+
+    if let Ok(Some(button)) = state.borrow().archive_content.query_selector("button") {
+        button.dyn_into::<HtmlElement>().ok().and_then(|button| {
+            button.focus().ok();
+            Some(())
+        });
+    }
+}
+
+fn close_archive(state: SharedState) {
+    state
+        .borrow()
+        .archive_overlay
+        .set_attribute("hidden", "true")
+        .ok();
+
+    if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+        if let Ok(Some(button)) = document.query_selector("#open-archive") {
+            if let Ok(button) = button.dyn_into::<HtmlElement>() {
+                button.focus().ok();
+            }
+        }
+    }
+}
+
+fn render_archive(state: SharedState) {
+    let (year, month, selected, today, entries) = {
+        let state = state.borrow();
+        (
+            state.archive_year,
+            state.archive_month,
+            state.selected_iso.clone(),
+            state.today_iso.clone(),
+            state.entries.clone(),
+        )
+    };
+
+    let html = render::archive(year, month, &selected, &today, &entries);
+    state.borrow().archive_content.set_inner_html(&html);
+}
+
+fn handle_archive_click(state: SharedState, event: Event) {
+    let Some(target) = target_element(&event) else {
+        return;
+    };
+
+    if let Ok(Some(year)) = target.closest("[data-archive-year]") {
+        if let Some(value) = year.get_attribute("data-archive-year") {
+            if let Ok(value) = value.parse::<i32>() {
+                state.borrow_mut().archive_year = value;
+                render_archive(state);
+            }
+        }
+        return;
+    }
+
+    if let Ok(Some(month)) = target.closest("[data-archive-month]") {
+        if let Some(value) = month.get_attribute("data-archive-month") {
+            if let Ok(value) = value.parse::<u32>() {
+                if (1..=12).contains(&value) {
+                    state.borrow_mut().archive_month = value;
+                    render_archive(state);
+                }
+            }
+        }
+        return;
+    }
+
+    if let Ok(Some(day)) = target.closest("[data-archive-day]") {
+        if let Some(iso) = day.get_attribute("data-archive-day") {
+            close_archive(state.clone());
+            spawn_result(select_date(state, iso));
+        }
+        return;
+    }
+
+    if target.closest("[data-archive-today]").ok().flatten().is_some() {
+        let today = state.borrow().today_iso.clone();
+        close_archive(state.clone());
+        spawn_result(select_date(state, today));
+        return;
+    }
+
+    if target
+        .closest("[data-archive-search]")
+        .ok()
+        .flatten()
+        .is_some()
+    {
+        close_archive(state.clone());
+        open_search(state);
+    }
 }
 
 fn open_sync(state: SharedState) {
@@ -3716,23 +3857,6 @@ async fn select_date(state: SharedState, iso: String) -> Result<(), JsValue> {
     Ok(())
 }
 
-fn shift_date(state: SharedState, days: i64) {
-    let iso = state.borrow().selected_iso.clone();
-    let Some(date) = parse_date(&iso) else {
-        return;
-    };
-
-    let next = date + Duration::days(days);
-    let next_iso = next.to_string();
-    let today = state.borrow().today_iso.clone();
-
-    if next_iso > today {
-        return;
-    }
-
-    spawn_result(select_date(state, next_iso));
-}
-
 fn shift_month(state: SharedState, delta: i32) {
     let (year, month) = {
         let state = state.borrow();
@@ -3781,17 +3905,6 @@ fn update_labels(state: &SharedState) {
         weekday_name(date)
     }));
     state.month_label.set_text_content(Some(&month_year(date)));
-
-    if selected_iso == today_iso {
-        state.today_button.set_attribute("hidden", "true").ok();
-        state
-            .next_day_button
-            .set_attribute("disabled", "true")
-            .ok();
-    } else {
-        state.today_button.remove_attribute("hidden").ok();
-        state.next_day_button.remove_attribute("disabled").ok();
-    }
 }
 
 fn schedule_save_kind(state: SharedState, kind: EditorKind) {

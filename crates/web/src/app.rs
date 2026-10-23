@@ -48,6 +48,7 @@ pub async fn timeline() -> Result<impl View> {
             data_overlay()
             welcome_overlay()
             sync_overlay()
+            archive_overlay()
         </div>
     })
 }
@@ -141,6 +142,63 @@ pub async fn sync_overlay() -> Result<impl View> {
                     </button>
                 </div>
                 <div id="sync-content" class="p-5">
+                    <p class="font-ui text-ui-label text-on-surface-variant/60">
+                        "Loading…"
+                    </p>
+                </div>
+            </div>
+        </div>
+    })
+}
+
+#[component]
+pub async fn archive_overlay() -> Result<impl View> {
+    Ok(view! {
+        <div
+            id="archive-overlay"
+            hidden="true"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="archive-title"
+            class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-20 backdrop-blur-sm sm:pt-24"
+        >
+            <div
+                class="w-full max-w-3xl overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-lowest shadow-2xl"
+            >
+                <div
+                    class="flex items-start justify-between gap-4 border-b border-outline-variant/40 px-5 py-4"
+                >
+                    <div>
+                        <p
+                            class="font-ui text-[9px] uppercase tracking-[0.16em] text-primary"
+                        >
+                            "Archive"
+                        </p>
+                        <h2
+                            id="archive-title"
+                            class="mt-1 font-display text-xl text-on-surface"
+                        >
+                            "Browse the journal"
+                        </h2>
+                        <p
+                            class="mt-1 font-ui text-ui-caption text-on-surface-variant/70"
+                        >
+                            "Years, months, and days."
+                        </p>
+                    </div>
+                    <button
+                        id="close-archive"
+                        type="button"
+                        aria-label="Close archive"
+                        class="rounded px-2 py-1 font-ui text-ui-label text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+                    >
+                        "×"
+                    </button>
+                </div>
+                <div
+                    id="archive-content"
+                    class="max-h-[calc(100vh-10rem)] overflow-y-auto p-5"
+                >
                     <p class="font-ui text-ui-label text-on-surface-variant/60">
                         "Loading…"
                     </p>
@@ -308,33 +366,6 @@ pub async fn today_entry() -> Result<impl View> {
                 <div
                     class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)] sm:p-6"
                 >
-                    <div class="mb-4 flex items-center justify-end gap-2">
-                        <button
-                            id="prev-day"
-                            type="button"
-                            class="rounded px-2 py-1 font-ui text-ui-label text-on-surface-variant/70 hover:bg-surface-container hover:text-on-surface"
-                            aria-label="Previous day"
-                        >
-                            "‹"
-                        </button>
-                        <button
-                            id="today-button"
-                            type="button"
-                            hidden="true"
-                            class="rounded px-2 py-1 font-ui text-ui-label text-primary hover:bg-surface-container"
-                        >
-                            "Today"
-                        </button>
-                        <button
-                            id="next-day"
-                            type="button"
-                            class="rounded px-2 py-1 font-ui text-ui-label text-on-surface-variant/70 hover:bg-surface-container hover:text-on-surface disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label="Next day"
-                        >
-                            "›"
-                        </button>
-                    </div>
-
                     <div
                         id="entry-editor"
                         class="live-editor min-h-[14rem] w-full font-journal text-journal text-on-surface sm:min-h-[20rem]"
@@ -613,6 +644,35 @@ pub async fn topbar() -> Result<impl View> {
                         "⌘K"
                     </span>
                 </button>
+                <button
+                    id="open-archive"
+                    type="button"
+                    aria-label="Browse the journal archive"
+                    class="inline-flex h-9 shrink-0 items-center gap-2 rounded border border-outline-variant/60 px-3 font-ui text-ui-label text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                >
+                    <svg
+                        aria-hidden="true"
+                        class="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <rect x="3.5" y="5" width="17" height="16" rx="2"></rect>
+                        <path d="M8 3v4"></path>
+                        <path d="M16 3v4"></path>
+                        <path d="M3.5 10h17"></path>
+                        <path d="M8 14h.01"></path>
+                        <path d="M12 14h.01"></path>
+                        <path d="M16 14h.01"></path>
+                        <path d="M8 17.5h.01"></path>
+                        <path d="M12 17.5h.01"></path>
+                    </svg>
+                    <span class="hidden sm:inline">"Archive"</span>
+                </button>
+
                 <button
                     id="theme-toggle"
                     type="button"

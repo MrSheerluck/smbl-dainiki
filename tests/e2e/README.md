@@ -46,6 +46,7 @@ Journal (`test_journal.py`):
 - inline editing of past entries while today stays at the top
 - local search opening an inline editor with live Markdown preview
 - tag counts/filtering and calendar date selection
+- year/month/day archive navigation
 - light/dark theme persistence
 - external-change conflict copies
 - export zip, clear OPFS, import zip

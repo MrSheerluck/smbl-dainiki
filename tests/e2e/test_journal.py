@@ -231,6 +231,45 @@ class DainikiE2E(unittest.TestCase):
         self.assertEqual(self.page.locator("#timeline-entries .inline-live").count(), 1)
         self.assertEqual(self.page.locator("#today-day").inner_text(), str(dt.date.today().day))
 
+    def test_archive_jumps_across_years_months_and_days(self):
+        today = dt.date.today()
+        old = dt.date(today.year - 2, 3, 14)
+        last_year = dt.date(today.year - 1, 7, 4)
+        self.seed(
+            [
+                {"iso": old.isoformat(), "text": "A spring day years ago. #archive"},
+                {"iso": last_year.isoformat(), "text": "A summer entry."},
+            ]
+        )
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(900)
+
+        self.assertEqual(self.page.locator("#prev-day").count(), 0)
+        self.assertEqual(self.page.locator("#next-day").count(), 0)
+
+        self.page.locator("#open-archive").click()
+        self.page.wait_for_timeout(300)
+        self.assertTrue(self.page.locator("#archive-overlay").is_visible())
+        self.assertIn("Browse the journal", self.page.locator("#archive-overlay").inner_text())
+
+        self.page.locator(f'[data-archive-year="{old.year}"]').click()
+        self.page.locator('[data-archive-month="3"]').click()
+        self.page.locator(f'[data-archive-day="{old.isoformat()}"]').click()
+        self.page.wait_for_timeout(800)
+
+        self.assertFalse(self.page.locator("#archive-overlay").is_visible())
+        self.assertEqual(self.page.locator("#today-day").inner_text(), str(old.day))
+        self.assertIn("A spring day years ago.", self.page.locator("#entry-editor").inner_text())
+
+        self.page.locator("#open-archive").click()
+        self.page.wait_for_timeout(200)
+        self.page.locator("[data-archive-today]").click()
+        self.page.wait_for_timeout(700)
+        self.assertEqual(
+            self.page.locator("#today-day").inner_text(),
+            str(today.day),
+        )
+
     def test_tags_filter_and_calendar(self):
         today = self.today()
         yesterday = iso_shift(today, -1)

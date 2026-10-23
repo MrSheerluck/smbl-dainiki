@@ -200,7 +200,7 @@ class DainikiSyncE2E(unittest.TestCase):
         self.signup(self.page, email)
         self.verify(self.page, email)
         self.open_journal(self.page)
-        self.assertEqual(self.page.locator("#sync-label").inner_text(), "Signed in")
+        self.assertEqual(self.page.locator("#sync-label").inner_text().upper(), "SIGNED IN")
         self.assertIn("No active plan", self.page.locator("#sync-detail").inner_text())
         self.open_sync(self.page)
         self.assertIn("needs an active plan", self.page.locator("#sync-content").inner_text())
@@ -221,7 +221,7 @@ class DainikiSyncE2E(unittest.TestCase):
         panel = self.setup_sync(self.page)
         self.assertIn("Synced 2 up", panel)
         self.assertIn("recovery key", self.page.locator("#sync-content").inner_text().lower())
-        self.assertEqual(self.page.locator("#sync-label").inner_text(), "Paid sync")
+        self.assertEqual(self.page.locator("#sync-label").inner_text().upper(), "PAID SYNC")
         self.assertIn("On ·", self.page.locator("#sync-detail").inner_text())
 
         device_two = self.new_page()

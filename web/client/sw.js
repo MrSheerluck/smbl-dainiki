@@ -1,8 +1,8 @@
-const CACHE = "dainiki-shell-v3";
+const CACHE = "dainiki-shell-v4";
 const SHELL = [
   "/",
-  "/loader.js",
-  "/pkg/dainiki_client.js",
+  "/loader.js?v=4",
+  "/pkg/dainiki_client.js?v=4",
   "/pkg/dainiki_client_bg.wasm",
   "/manifest.webmanifest",
   "/icon-192.png",

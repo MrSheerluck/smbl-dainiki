@@ -1,6 +1,7 @@
 import datetime as dt
 import os
 import platform
+import re
 import tempfile
 import unittest
 import zipfile
@@ -258,6 +259,57 @@ class DainikiE2E(unittest.TestCase):
             ).content"""
         )
         self.assertIn("type / for commands", placeholder)
+
+    def test_client_survives_old_cached_shell(self):
+        context = self.browser.new_context(viewport={"width": 1280, "height": 1000})
+        page = context.new_page()
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+
+        app_url = f"{BASE_URL.rstrip('/')}/"
+        response = context.request.get(app_url)
+        html = response.text()
+        html = re.sub(
+            r'<div[^>]*id="slash-menu"[^>]*>.*?</div>\s*</div>',
+            "",
+            html,
+            flags=re.S,
+        )
+        html = html.replace(
+            ' data-placeholder="Start writing, or type / for commands…"', ""
+        )
+
+        page.route(
+            app_url,
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body=html,
+            ),
+        )
+        page.goto(app_url, wait_until="networkidle")
+        page.wait_for_selector("#entry-editor .line", timeout=15000)
+        page.wait_for_timeout(1200)
+
+        self.assertNotEqual(page.locator("#entry-status").inner_text(), "Loading…")
+        self.assertEqual(
+            page.locator("#entry-editor").get_attribute("data-placeholder"),
+            "Start writing, or type / for commands…",
+        )
+        self.assertEqual(errors, [])
+
+        if page.locator("#welcome-overlay").is_visible():
+            page.locator("#start-writing").click()
+            page.wait_for_timeout(300)
+
+        before = page.evaluate("document.documentElement.dataset.theme")
+        page.locator("#theme-toggle").click()
+        page.wait_for_timeout(500)
+        self.assertNotEqual(
+            page.evaluate("document.documentElement.dataset.theme"),
+            before,
+        )
+        context.close()
 
     def test_inline_past_entry_editing(self):
         today = self.today()

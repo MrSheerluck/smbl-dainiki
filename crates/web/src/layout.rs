@@ -3,7 +3,7 @@ use crate::typography::{INTER, NEWSREADER};
 use topcoat::{
     Result,
     context::Cx,
-    router::{Slot, layout, request::uri},
+    router::{Slot, header, layout, request::uri, response::response_headers},
     view::{View, view},
 };
 
@@ -21,6 +21,11 @@ fn app_origin() -> String {
 
 #[layout("/")]
 pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
+    response_headers(cx).append(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("no-store, max-age=0"),
+    );
+
     let path = uri(cx).path();
     let journal = path == "/";
     let origin = app_origin();
@@ -50,6 +55,9 @@ pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
             <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
+                <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+                <meta http-equiv="Pragma" content="no-cache">
+                <meta http-equiv="Expires" content="0">
                 <meta name="theme-color" content="#fef8f6">
                 <meta name="description" content=(OG_DESCRIPTION)>
                 <meta property="og:type" content="website">
@@ -102,7 +110,7 @@ pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
             <body class="bg-surface font-ui text-ui-body text-on-surface antialiased">
                 (slot)
                 if journal {
-                    <script type="module" src="/loader.js"></script>
+                    <script type="module" src="/loader.js?v=4"></script>
                 }
             </body>
         </html>

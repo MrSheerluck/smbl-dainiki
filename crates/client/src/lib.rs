@@ -88,8 +88,8 @@ struct State {
     inline_redo_stack: Vec<String>,
     inline_last_snapshot: String,
     inline_history_timeout: Option<Timeout>,
-    slash_menu: Element,
-    slash_items: Element,
+    slash_menu: Option<Element>,
+    slash_items: Option<Element>,
     slash_open: bool,
     slash_index: usize,
     slash_kind: Option<EditorKind>,
@@ -238,6 +238,33 @@ const SLASH_COMMANDS: &[SlashCommand] = &[
     },
 ];
 
+fn prepare_editor_shell(document: &Document, editor: &HtmlElement) -> Result<(), JsValue> {
+    let placeholder = editor.get_attribute("data-placeholder");
+
+    if placeholder.is_none() {
+        editor.set_attribute(
+            "data-placeholder",
+            "Start writing, or type / for commands…",
+        )?;
+    }
+
+    // A page cached before the placeholder/slash-menu release can be paired
+    // with a newer client. Keep the hint working until that shell refreshes.
+    if placeholder.is_none() && document.query_selector("#dainiki-shell-style")?.is_none() {
+        let style = document.create_element("style")?;
+        style.set_id("dainiki-shell-style");
+        style.set_text_content(Some(
+            r#".live-editor{position:relative}.live-editor[data-empty="true"]::before{content:attr(data-placeholder);position:absolute;inset-inline-start:0;top:0;pointer-events:none;color:color-mix(in oklab,var(--color-on-surface-variant) 48%,transparent)}"#,
+        ));
+
+        if let Some(head) = document.query_selector("head")? {
+            head.append_child(style.as_ref())?;
+        }
+    }
+
+    Ok(())
+}
+
 fn spawn_result<F>(future: F)
 where
     F: Future<Output = Result<(), JsValue>> + 'static,
@@ -259,6 +286,7 @@ pub fn start() -> Result<(), JsValue> {
         .ok_or_else(|| JsValue::from_str("no document"))?;
 
     let editor = query::<HtmlElement>(&document, "#entry-editor")?;
+    prepare_editor_shell(&document, &editor)?;
     let today_iso = today_iso();
     let (calendar_year, calendar_month) = month_parts(&today_iso);
 
@@ -319,8 +347,8 @@ pub fn start() -> Result<(), JsValue> {
         inline_redo_stack: Vec::new(),
         inline_last_snapshot: String::new(),
         inline_history_timeout: None,
-        slash_menu: element(&document, "#slash-menu")?,
-        slash_items: element(&document, "#slash-items")?,
+        slash_menu: document.query_selector("#slash-menu")?,
+        slash_items: document.query_selector("#slash-items")?,
         slash_open: false,
         slash_index: 0,
         slash_kind: None,
@@ -376,7 +404,7 @@ async fn register_service_worker() -> Result<(), JsValue> {
     let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
     let container = window.navigator().service_worker();
 
-    JsFuture::from(container.register("/sw.js")).await?;
+    JsFuture::from(container.register("/sw.js?v=4")).await?;
     Ok(())
 }
 
@@ -938,50 +966,55 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
-    let slash_pointerdown_state = state.clone();
-    listen(
-        state.borrow().slash_menu.as_ref(),
-        "pointerdown",
-        Closure::<dyn FnMut(Event)>::new(move |event: Event| {
-            if slash_pointerdown_state.borrow().slash_open {
-                event.prevent_default();
-            }
-        }),
-    )?;
-
-    let slash_click_state = state.clone();
-    let slash_click_document = document.clone();
-    listen(
-        state.borrow().slash_menu.as_ref(),
-        "click",
-        Closure::<dyn FnMut(Event)>::new(move |event| {
-            handle_slash_click(
-                slash_click_state.clone(),
-                &slash_click_document,
-                event,
-            );
-        }),
-    )?;
-
-    for event_name in ["wheel", "touchmove"] {
-        let dismiss_state = state.clone();
+    if let Some(slash_menu) = state.borrow().slash_menu.clone() {
+        let slash_pointerdown_state = state.clone();
         listen(
-            document.as_ref(),
-            event_name,
+            slash_menu.as_ref(),
+            "pointerdown",
             Closure::<dyn FnMut(Event)>::new(move |event: Event| {
-                let (open, inside) = {
-                    let state = dismiss_state.borrow();
-                    let inside = target_element(&event).is_some_and(|target| {
-                        state.slash_menu.contains(Some(&target))
-                    });
-                    (state.slash_open, inside)
-                };
-
-                if open && !inside {
-                    close_slash_menu(&dismiss_state);
+                if slash_pointerdown_state.borrow().slash_open {
+                    event.prevent_default();
                 }
             }),
         )?;
+
+        let slash_click_state = state.clone();
+        let slash_click_document = document.clone();
+        listen(
+            slash_menu.as_ref(),
+            "click",
+            Closure::<dyn FnMut(Event)>::new(move |event| {
+                handle_slash_click(
+                    slash_click_state.clone(),
+                    &slash_click_document,
+                    event,
+                );
+            }),
+        )?;
+
+        for event_name in ["wheel", "touchmove"] {
+            let dismiss_state = state.clone();
+            listen(
+                document.as_ref(),
+                event_name,
+                Closure::<dyn FnMut(Event)>::new(move |event: Event| {
+                    let (open, inside) = {
+                        let state = dismiss_state.borrow();
+                        let inside = target_element(&event).is_some_and(|target| {
+                            state
+                                .slash_menu
+                                .as_ref()
+                                .is_some_and(|menu| menu.contains(Some(&target)))
+                        });
+                        (state.slash_open, inside)
+                    };
+
+                    if open && !inside {
+                        close_slash_menu(&dismiss_state);
+                    }
+                }),
+            )?;
+        }
     }
 
     let tag_state = state.clone();
@@ -1732,6 +1765,15 @@ fn refresh_editor_chrome(state: &SharedState, document: &Document, kind: EditorK
 }
 
 fn sync_slash_menu(state: SharedState, document: &Document, kind: EditorKind) {
+    let has_menu = {
+        let state = state.borrow();
+        state.slash_menu.is_some() && state.slash_items.is_some()
+    };
+
+    if !has_menu {
+        return;
+    }
+
     let Some(editor) = editor_element(&state.borrow(), kind) else {
         close_slash_menu(&state);
         return;
@@ -1772,7 +1814,7 @@ fn sync_slash_menu(state: SharedState, document: &Document, kind: EditorKind) {
 }
 
 fn render_slash_menu(state: SharedState) {
-    let (html, line, selected) = {
+    let (html, line, selected, menu, items) = {
         let state = state.borrow();
         let commands = filtered_slash_commands(&state.slash_query);
         let selected = state.slash_index.min(commands.len().saturating_sub(1));
@@ -1780,19 +1822,15 @@ fn render_slash_menu(state: SharedState) {
             slash_items_html(&commands, selected),
             state.slash_anchor.clone(),
             selected,
+            state.slash_menu.clone(),
+            state.slash_items.clone(),
         )
     };
-    let Some(line) = line else {
-        close_slash_menu(&state);
+    let (Some(line), Some(menu), Some(items)) = (line, menu, items) else {
         return;
     };
 
     state.borrow_mut().slash_index = selected;
-
-    let (menu, items) = {
-        let state = state.borrow();
-        (state.slash_menu.clone(), state.slash_items.clone())
-    };
 
     menu.remove_attribute("hidden").ok();
     items.set_inner_html(&html);
@@ -1847,7 +1885,9 @@ fn close_slash_menu(state: &SharedState) {
         menu
     };
 
-    menu.set_attribute("hidden", "true").ok();
+    if let Some(menu) = menu {
+        menu.set_attribute("hidden", "true").ok();
+    }
 }
 
 fn move_slash_selection(state: SharedState, direction: isize) {
@@ -1873,6 +1913,9 @@ fn highlight_slash_selection(state: &SharedState) {
     let (menu, selected) = {
         let state = state.borrow();
         (state.slash_menu.clone(), state.slash_index)
+    };
+    let Some(menu) = menu else {
+        return;
     };
 
     if let Ok(Some(previous)) = menu.query_selector("[data-selected=\"true\"]") {

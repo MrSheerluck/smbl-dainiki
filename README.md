@@ -192,10 +192,10 @@ manual sign-off:
 - Installable PWA with an offline app shell.
 - Incremental timeline pagination and a mobile sidebar drawer.
 - First-run onboarding with a persistent-storage request.
-- Nineteen local journal browser tests covering storage, editing, slash
-  commands, empty-entry placeholders, cached-shell compatibility, search,
-  themes, zen mode, explicit data-panel entry management, conflicts,
-  import/export, offline mode, and mobile.
+- Twenty local journal browser tests covering storage, editing, slash
+  commands, empty-entry placeholders, cached-shell compatibility, Firefox
+  caret recovery, search, themes, zen mode, explicit data-panel entry
+  management, conflicts, import/export, offline mode, and mobile.
 
 Accounts, auth, billing, and encrypted sync are working: email/password signup,
 Argon2id hashing, Postgres-backed sessions, email verification, password reset,

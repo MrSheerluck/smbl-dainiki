@@ -1760,8 +1760,99 @@ fn refresh_editor_chrome(state: &SharedState, document: &Document, kind: EditorK
         return;
     };
 
+    repair_editor_root(&editor, document);
     markdown::update_empty_state(&editor);
     sync_slash_menu(state.clone(), document, kind);
+}
+
+fn repair_editor_root(editor: &Element, document: &Document) {
+    let mut changed = false;
+    let mut last_line = None;
+    let mut child = editor.first_child();
+
+    while let Some(node) = child {
+        let next = node.next_sibling();
+        let is_line = node
+            .dyn_ref::<Element>()
+            .is_some_and(|element| element.class_list().contains("line"));
+
+        if !is_line {
+            let text = node.text_content().unwrap_or_default();
+
+            if !text.is_empty()
+                && let Some((line, prepend)) = line_near_node(&node)
+            {
+                let source = line.text_content().unwrap_or_default();
+                let next_source = if prepend {
+                    format!("{text}{source}")
+                } else {
+                    format!("{source}{text}")
+                };
+                let active = line.class_list().contains("active");
+                markdown::render_line_into(&line, &next_source, active);
+                last_line = Some(line);
+            }
+
+            if let Some(parent) = node.parent_node() {
+                parent.remove_child(&node).ok();
+            }
+            changed = true;
+        }
+
+        child = next;
+    }
+
+    if changed {
+        if let Some(line) = last_line {
+            line.class_list().add_1("active").ok();
+            place_caret(document, &line, false);
+        }
+        return;
+    }
+
+    let anchor_outside_line = document
+        .get_selection()
+        .ok()
+        .flatten()
+        .and_then(|selection| selection.anchor_node())
+        .is_some_and(|node| editor.contains(Some(&node)) && markdown::line_of(&node).is_none());
+
+    if !anchor_outside_line {
+        return;
+    }
+
+    if let Some(line) = caret_line(document, editor) {
+        line.class_list().add_1("active").ok();
+        place_caret(document, &line, false);
+    }
+}
+
+fn line_near_node(node: &Node) -> Option<(Element, bool)> {
+    let mut previous = node.previous_sibling();
+
+    while let Some(current) = previous {
+        if let Some(element) = current.dyn_ref::<Element>()
+            && element.class_list().contains("line")
+        {
+            return Some((element.clone(), false));
+        }
+
+        previous = current.previous_sibling();
+    }
+
+    let mut next = node.next_sibling();
+
+    while let Some(current) = next {
+        if let Some(element) = current.dyn_ref::<Element>()
+            && element.class_list().contains("line")
+        {
+            return Some((element.clone(), true));
+        }
+
+        next = current.next_sibling();
+    }
+
+    None
 }
 
 fn sync_slash_menu(state: SharedState, document: &Document, kind: EditorKind) {

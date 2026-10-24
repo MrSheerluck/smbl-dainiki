@@ -260,6 +260,34 @@ class DainikiE2E(unittest.TestCase):
         )
         self.assertIn("type / for commands", placeholder)
 
+    def test_typing_from_editor_root_stays_in_line(self):
+        self.page.evaluate(
+            """() => {
+                const editor = document.querySelector("#entry-editor");
+                editor.focus();
+                const selection = getSelection();
+                selection.removeAllRanges();
+                selection.collapse(editor, 0);
+            }"""
+        )
+        self.page.keyboard.type("/")
+        self.page.wait_for_timeout(300)
+
+        self.assertEqual(self.page.locator("#entry-editor > .line").count(), 1)
+        self.assertEqual(
+            self.page.locator("#entry-editor > .line").first.inner_text(), "/"
+        )
+        self.assertEqual(
+            self.page.locator("#entry-editor").get_attribute("data-empty"), "false"
+        )
+        self.assertTrue(self.page.locator("#slash-menu").is_visible())
+
+        self.page.keyboard.type("h2")
+        self.page.keyboard.press("Enter")
+        self.page.wait_for_timeout(300)
+        self.assertEqual(self.page.locator("#entry-editor .line.md-h2").count(), 1)
+        self.assertFalse(self.page.locator("#slash-menu").is_visible())
+
     def test_client_survives_old_cached_shell(self):
         context = self.browser.new_context(viewport={"width": 1280, "height": 1000})
         page = context.new_page()

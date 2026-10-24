@@ -190,7 +190,7 @@ pub async fn pricing() -> Result<impl View> {
                             <span
                                 class="font-ui-caption text-ui-caption px-2 py-0.5 rounded bg-surface-container text-on-surface-variant"
                             >
-                                "MIT"
+                                "AGPL-3.0"
                             </span>
                         </div>
                         <p
@@ -242,7 +242,7 @@ pub async fn pricing() -> Result<impl View> {
                             <p
                                 class="mt-3 text-center font-ui-caption text-ui-caption text-on-surface-variant/70"
                             >
-                                "MIT licensed. Setup notes live in the repository."
+                                "AGPL-3.0 licensed. Setup notes live in the repository."
                             </p>
                         </div>
                     </div>

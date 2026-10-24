@@ -20,7 +20,7 @@ pub async fn footer() -> Result<impl View> {
                         <span
                             class="font-ui-caption text-ui-caption text-on-surface-variant"
                         >
-                            "© 2026 SMBL Foundation. Open source under the MIT License."
+                            "© 2026 SMBL Foundation. Open source under the AGPL-3.0 License."
                         </span>
                     </div>
                     <p class="font-ui-caption text-ui-caption text-on-surface-variant">

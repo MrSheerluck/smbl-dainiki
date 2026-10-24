@@ -182,7 +182,7 @@ pub async fn faq() -> Result<impl View> {
                     <p
                         class="font-journal-body text-journal-body text-on-surface-variant leading-relaxed mt-3 pr-8"
                     >
-                        "Yes. Dainiki is MIT licensed. The self-hosted build includes auth, sync, and storage configuration, with SMTP or Resend for email and Cloudflare R2 or a local disk for storage."
+                        "Yes. Dainiki is AGPL-3.0 licensed. The self-hosted build includes auth, sync, and storage configuration, with SMTP or Resend for email and Cloudflare R2 or a local disk for storage."
                     </p>
                 </details>
             </div>

@@ -44,7 +44,7 @@
     <text x="24" y="29" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#ffffff">Join the waitlist</text>
   </g>
 
-  <text x="80" y="612" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="14" fill="#727973">dainiki.smbl.dev  ·  MIT  ·  Rust + Topcoat</text>
+  <text x="80" y="612" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="14" fill="#727973">dainiki.smbl.dev  ·  AGPL-3.0  ·  Rust + Topcoat</text>
 
   <text x="900" y="566" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="26" font-style="italic" fill="#944924" opacity="0.8">No photos. No feeds.</text>
   <text x="900" y="598" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="26" font-style="italic" fill="#944924" opacity="0.8">Just words.</text>

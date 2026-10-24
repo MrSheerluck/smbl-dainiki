@@ -157,6 +157,44 @@ class DainikiE2E(unittest.TestCase):
         self.assertIn("A quiet test entry.", self.page.locator("#entry-editor").inner_text())
         self.assertEqual(self.page.locator("#today-day").inner_text(), str(dt.date.today().day))
 
+    def test_enter_adds_and_saves_new_line(self):
+        today = self.today()
+        self.type_today("First line")
+        self.page.keyboard.press("Enter")
+        self.page.keyboard.type("Second line")
+        self.page.wait_for_timeout(900)
+
+        self.assertEqual(self.page.locator("#entry-editor .line").count(), 2)
+        self.assertEqual(
+            self.page.locator("#entry-editor .line").nth(1).inner_text(),
+            "Second line",
+        )
+        self.assertEqual(self.read_entry(today), "First line\nSecond line")
+
+        # Firefox can leave the caret in the contenteditable root instead of a
+        # line. Enter must still split the last line there.
+        self.page.evaluate(
+            """() => {
+                const editor = document.querySelector("#entry-editor");
+                const selection = getSelection();
+                selection.removeAllRanges();
+                selection.collapse(editor, editor.childNodes.length);
+            }"""
+        )
+        self.page.keyboard.press("Enter")
+        self.page.keyboard.type("Third line")
+        self.page.wait_for_timeout(900)
+
+        self.assertEqual(self.page.locator("#entry-editor .line").count(), 3)
+        self.assertEqual(
+            self.page.locator("#entry-editor .line").nth(2).inner_text(),
+            "Third line",
+        )
+        self.assertEqual(
+            self.read_entry(today),
+            "First line\nSecond line\nThird line",
+        )
+
     def test_inline_past_entry_editing(self):
         today = self.today()
         yesterday = iso_shift(today, -1)

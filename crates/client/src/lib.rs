@@ -27,7 +27,7 @@ use wasm_bindgen::{JsCast, JsValue, prelude::*};
 use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::{
     Blob, ClipboardEvent, Document, Element, Event, File, HtmlAnchorElement, HtmlElement,
-    HtmlInputElement, KeyboardEvent, Node, Url,
+    HtmlInputElement, InputEvent, KeyboardEvent, Node, Url,
 };
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::SimpleFileOptions};
 
@@ -786,6 +786,21 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         }),
     )?;
 
+    let beforeinput_state = state.clone();
+    let beforeinput_document = document.clone();
+    listen(
+        editor.as_ref(),
+        "beforeinput",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_beforeinput(
+                beforeinput_state.clone(),
+                &beforeinput_document,
+                event,
+                EditorKind::Main,
+            );
+        }),
+    )?;
+
     let selection_state = state.clone();
     let selection_document = document.clone();
     listen(
@@ -1490,12 +1505,36 @@ fn handle_keydown(state: SharedState, document: &Document, event: Event) {
     }
 
     if event.key() == "Enter" {
-        event.prevent_default();
-        split_line(state, document, kind);
+        if split_line(state, document, kind) {
+            event.prevent_default();
+        }
         return;
     }
 
     if event.key() == "Backspace" && merge_line(state, document, kind) {
+        event.prevent_default();
+    }
+}
+
+fn handle_beforeinput(
+    state: SharedState,
+    document: &Document,
+    event: Event,
+    kind: EditorKind,
+) {
+    let Ok(event) = event.dyn_into::<InputEvent>() else {
+        return;
+    };
+
+    if event.is_composing() {
+        return;
+    }
+
+    if matches!(
+        event.input_type().as_str(),
+        "insertParagraph" | "insertLineBreak"
+    ) && split_line(state, document, kind)
+    {
         event.prevent_default();
     }
 }
@@ -3771,7 +3810,7 @@ fn handle_paste(
 }
 
 fn ensure_active_line(document: &Document, editor: &Element) -> Option<Element> {
-    if let Some(line) = active_line(document) {
+    if let Some(line) = caret_line(document, editor) {
         return Some(line);
     }
 
@@ -3862,7 +3901,7 @@ fn update_active_line(state: SharedState, document: &Document) {
     let Some(editor) = editor_element(&state.borrow(), kind) else {
         return;
     };
-    let new_line = active_line(document);
+    let new_line = caret_line(document, &editor);
     let old_line = editor.query_selector(".line.active").ok().flatten();
 
     if old_line == new_line {
@@ -3879,9 +3918,12 @@ fn update_active_line(state: SharedState, document: &Document) {
     }
 }
 
-fn split_line(state: SharedState, document: &Document, kind: EditorKind) {
-    let Some(line) = active_line(document) else {
-        return;
+fn split_line(state: SharedState, document: &Document, kind: EditorKind) -> bool {
+    let Some(editor) = editor_element(&state.borrow(), kind) else {
+        return false;
+    };
+    let Some(line) = caret_line(document, &editor) else {
+        return false;
     };
 
     push_current_history(&state, kind);
@@ -3893,13 +3935,13 @@ fn split_line(state: SharedState, document: &Document, kind: EditorKind) {
     markdown::render_line_into(&line, before, false);
 
     let Ok(new_line) = document.create_element("div") else {
-        return;
+        return false;
     };
 
     markdown::render_line_into(&new_line, after, true);
 
     let Some(parent) = line.parent_node() else {
-        return;
+        return false;
     };
 
     let reference = line.next_sibling();
@@ -3907,16 +3949,20 @@ fn split_line(state: SharedState, document: &Document, kind: EditorKind) {
         .insert_before(new_line.as_ref(), reference.as_ref())
         .is_err()
     {
-        return;
+        return false;
     }
 
     place_caret(document, &new_line, true);
     sync_snapshot(&state, kind);
     schedule_save_kind(state, kind);
+    true
 }
 
 fn merge_line(state: SharedState, document: &Document, kind: EditorKind) -> bool {
-    let Some(line) = active_line(document) else {
+    let Some(editor) = editor_element(&state.borrow(), kind) else {
+        return false;
+    };
+    let Some(line) = caret_line(document, &editor) else {
         return false;
     };
 
@@ -3946,6 +3992,54 @@ fn active_line(document: &Document) -> Option<Element> {
     let node = selection.anchor_node()?;
 
     markdown::line_of(&node)
+}
+
+fn caret_line(document: &Document, editor: &Element) -> Option<Element> {
+    if let Some(line) = active_line(document) {
+        return Some(line);
+    }
+
+    // Firefox can leave the caret directly in the contenteditable root when an
+    // empty line is clicked. Resolve that caret to the nearest line so Enter
+    // still splits the block instead of being silently swallowed.
+    let selection = document.get_selection().ok()??;
+    let anchor = selection.anchor_node()?;
+
+    if !editor.contains(Some(&anchor)) {
+        return None;
+    }
+
+    let offset = selection.anchor_offset() as usize;
+    let mut child = editor.first_child();
+    let mut index = 0;
+    let mut previous_line = None;
+
+    while let Some(current) = child {
+        let line = current
+            .dyn_ref::<Element>()
+            .filter(|element| element.class_list().contains("line"))
+            .cloned();
+
+        if anchor.is_same_node(Some(editor.as_ref())) && index >= offset {
+            return line.or(previous_line);
+        }
+
+        if !anchor.is_same_node(Some(editor.as_ref()))
+            && current.contains(Some(&anchor))
+            && let Some(line) = line.as_ref()
+        {
+            return Some(line.clone());
+        }
+
+        if line.is_some() {
+            previous_line = line;
+        }
+
+        index += 1;
+        child = current.next_sibling();
+    }
+
+    previous_line
 }
 
 fn caret_offset(document: &Document, line: &Element) -> Option<usize> {
@@ -4525,6 +4619,21 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
         "keydown",
         Closure::<dyn FnMut(Event)>::new(move |event| {
             handle_keydown(key_state.clone(), &key_document, event);
+        }),
+    )?;
+
+    let beforeinput_state = state.clone();
+    let beforeinput_document = document.clone();
+    listen(
+        editor.as_ref(),
+        "beforeinput",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_beforeinput(
+                beforeinput_state.clone(),
+                &beforeinput_document,
+                event,
+                EditorKind::Inline,
+            );
         }),
     )?;
 

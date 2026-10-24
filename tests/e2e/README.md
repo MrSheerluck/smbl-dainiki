@@ -43,6 +43,8 @@ may rebuild and briefly drop the port.
 Journal (`test_journal.py`):
 
 - write, autosave, reload, OPFS persistence
+- Enter creates and saves new lines, including with the caret in the
+  contenteditable root (Firefox)
 - inline editing of past entries while today stays at the top
 - local search opening an inline editor with live Markdown preview
 - tag counts/filtering and calendar date selection

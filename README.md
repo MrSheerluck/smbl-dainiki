@@ -176,6 +176,8 @@ manual sign-off:
 - OPFS-backed Markdown entries, one file per day.
 - Rust/WASM client with a cursor-aware live preview editor: the active line
   shows Markdown source, inactive lines render inline.
+- Slash menu for headings, lists, quotes, dividers, and inline styles, plus
+  Notion-style placeholders on empty entries.
 - Daily editor with previous/next day navigation.
 - Timeline built by scanning the stored files.
 - Live tag counts, clickable tag filters, and a calendar with entry marks.
@@ -190,9 +192,10 @@ manual sign-off:
 - Installable PWA with an offline app shell.
 - Incremental timeline pagination and a mobile sidebar drawer.
 - First-run onboarding with a persistent-storage request.
-- Fifteen local journal browser tests covering storage, editing, search, themes,
-  zen mode, explicit data-panel entry management, conflicts, import/export,
-  offline mode, and mobile.
+- Eighteen local journal browser tests covering storage, editing, slash
+  commands, empty-entry placeholders, search, themes, zen mode, explicit
+  data-panel entry management, conflicts, import/export, offline mode, and
+  mobile.
 
 Accounts, auth, billing, and encrypted sync are working: email/password signup,
 Argon2id hashing, Postgres-backed sessions, email verification, password reset,

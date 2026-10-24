@@ -270,6 +270,7 @@ html[data-theme="dark"] .theme-icon-moon {
 
 
 .live-editor {
+  position: relative;
   color: var(--color-on-surface);
   font-family: var(--font-journal);
   font-size: 1.0625rem;
@@ -277,6 +278,121 @@ html[data-theme="dark"] .theme-icon-moon {
   outline: none;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.live-editor[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  pointer-events: none;
+  color: color-mix(
+    in oklab,
+    var(--color-on-surface-variant) 48%,
+    transparent
+  );
+}
+
+.slash-menu {
+  position: fixed;
+  z-index: 60;
+  width: 17.5rem;
+  max-width: calc(100vw - 1.5rem);
+  max-height: min(22rem, calc(100vh - 1.5rem));
+  overflow-y: auto;
+  border: 1px solid
+    color-mix(in oklab, var(--color-outline-variant) 75%, transparent);
+  border-radius: 0.75rem;
+  background: var(--color-surface-container-lowest);
+  padding: 0.35rem;
+  box-shadow:
+    0 24px 50px -30px color-mix(in oklab, var(--color-on-surface) 50%, transparent),
+    0 2px 8px -4px color-mix(in oklab, var(--color-on-surface) 18%, transparent);
+  font-family: var(--font-ui);
+}
+
+.slash-menu[hidden] {
+  display: none;
+}
+
+.slash-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.5rem 0.35rem;
+  color: color-mix(in oklab, var(--color-on-surface-variant) 68%, transparent);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.slash-menu-head span:last-child {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.slash-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.6rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  padding: 0.38rem 0.45rem;
+  color: var(--color-on-surface);
+  text-align: left;
+}
+
+.slash-item:hover,
+.slash-item[data-selected="true"] {
+  background: color-mix(
+    in oklab,
+    var(--color-primary) 11%,
+    var(--color-surface-container)
+  );
+}
+
+.slash-icon {
+  display: inline-flex;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid
+    color-mix(in oklab, var(--color-outline-variant) 65%, transparent);
+  border-radius: 0.45rem;
+  background: var(--color-surface-container-low);
+  color: color-mix(in oklab, var(--color-on-surface-variant) 85%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+}
+
+.slash-item[data-selected="true"] .slash-icon {
+  border-color: transparent;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.slash-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-empty {
+  padding: 0.8rem 0.5rem;
+  color: color-mix(in oklab, var(--color-on-surface-variant) 62%, transparent);
+  font-size: 0.75rem;
+  text-align: center;
 }
 
 .live-editor .line {

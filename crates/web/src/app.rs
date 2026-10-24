@@ -77,6 +77,25 @@ pub async fn timeline() -> Result<impl View> {
             archive_overlay()
             conflict_overlay()
             settings_overlay()
+            slash_menu()
+        </div>
+    })
+}
+
+#[component]
+pub async fn slash_menu() -> Result<impl View> {
+    Ok(view! {
+        <div
+            id="slash-menu"
+            hidden="true"
+            aria-label="Insert block"
+            class="slash-menu"
+        >
+            <div class="slash-menu-head">
+                <span>"Insert block"</span>
+                <span>"↑↓ move · ↵ insert · Esc close"</span>
+            </div>
+            <div id="slash-items"></div>
         </div>
     })
 }
@@ -653,6 +672,7 @@ pub async fn today_entry() -> Result<impl View> {
                         role="textbox"
                         aria-multiline="true"
                         aria-label="Journal entry"
+                        data-placeholder="Start writing, or type / for commands…"
                     ></div>
 
                     <div

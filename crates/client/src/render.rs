@@ -221,7 +221,7 @@ fn search_snippet(entry: &EntryRecord, query: &str) -> String {
 
 pub fn inline_editor() -> String {
     r#"<div class="rounded-xl border border-surface-container-high/50 bg-surface-container-lowest/80 p-5 shadow-[0_1px_3px_rgba(44,42,41,0.04)] sm:p-6">
-  <div class="inline-live live-editor min-h-[10rem] w-full font-journal text-journal text-on-surface outline-none" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Edit entry"></div>
+  <div class="inline-live live-editor min-h-[10rem] w-full font-journal text-journal text-on-surface outline-none" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Edit entry" data-placeholder="Start writing, or type / for commands…"></div>
   <div class="mt-3 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-2">
     <span aria-live="polite" class="inline-status font-ui text-[10px] text-on-surface-variant/60">Editing</span>
     <span class="font-ui text-[10px] text-on-surface-variant/40">Autosaves locally</span>

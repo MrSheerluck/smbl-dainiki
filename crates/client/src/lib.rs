@@ -88,6 +88,13 @@ struct State {
     inline_redo_stack: Vec<String>,
     inline_last_snapshot: String,
     inline_history_timeout: Option<Timeout>,
+    slash_menu: Element,
+    slash_items: Element,
+    slash_open: bool,
+    slash_index: usize,
+    slash_kind: Option<EditorKind>,
+    slash_anchor: Option<Element>,
+    slash_query: String,
     sidebar: Element,
     sidebar_backdrop: Element,
     welcome_overlay: Element,
@@ -126,6 +133,110 @@ enum EditorKind {
     Main,
     Inline,
 }
+
+#[derive(Clone, Copy)]
+enum SlashAction {
+    Prefix(&'static str),
+    Wrap(&'static str, &'static str),
+    Plain,
+    Divider,
+}
+
+#[derive(Clone, Copy)]
+struct SlashCommand {
+    id: &'static str,
+    label: &'static str,
+    icon: &'static str,
+    keywords: &'static str,
+    action: SlashAction,
+}
+
+const SLASH_COMMANDS: &[SlashCommand] = &[
+    SlashCommand {
+        id: "text",
+        label: "Text",
+        icon: "¶",
+        keywords: "paragraph plain body remove formatting",
+        action: SlashAction::Plain,
+    },
+    SlashCommand {
+        id: "h1",
+        label: "Heading 1",
+        icon: "H1",
+        keywords: "h1 heading title large",
+        action: SlashAction::Prefix("# "),
+    },
+    SlashCommand {
+        id: "h2",
+        label: "Heading 2",
+        icon: "H2",
+        keywords: "h2 heading subtitle title medium",
+        action: SlashAction::Prefix("## "),
+    },
+    SlashCommand {
+        id: "h3",
+        label: "Heading 3",
+        icon: "H3",
+        keywords: "h3 heading subtitle title small",
+        action: SlashAction::Prefix("### "),
+    },
+    SlashCommand {
+        id: "bullet",
+        label: "Bulleted list",
+        icon: "•",
+        keywords: "bullet list unordered point",
+        action: SlashAction::Prefix("- "),
+    },
+    SlashCommand {
+        id: "numbered",
+        label: "Numbered list",
+        icon: "1.",
+        keywords: "number numbered list ordered",
+        action: SlashAction::Prefix("1. "),
+    },
+    SlashCommand {
+        id: "quote",
+        label: "Quote",
+        icon: "❝",
+        keywords: "quote blockquote citation",
+        action: SlashAction::Prefix("> "),
+    },
+    SlashCommand {
+        id: "divider",
+        label: "Divider",
+        icon: "—",
+        keywords: "divider rule separator horizontal line",
+        action: SlashAction::Divider,
+    },
+    SlashCommand {
+        id: "bold",
+        label: "Bold",
+        icon: "B",
+        keywords: "bold strong emphasis",
+        action: SlashAction::Wrap("**", "**"),
+    },
+    SlashCommand {
+        id: "italic",
+        label: "Italic",
+        icon: "I",
+        keywords: "italic emphasis",
+        action: SlashAction::Wrap("*", "*"),
+    },
+    SlashCommand {
+        id: "strike",
+        label: "Strikethrough",
+        icon: "S",
+        keywords: "strike strikethrough crossed out",
+        action: SlashAction::Wrap("~~", "~~"),
+    },
+    SlashCommand {
+        id: "code",
+        label: "Inline code",
+        icon: "`",
+        keywords: "code inline monospace",
+        action: SlashAction::Wrap("`", "`"),
+    },
+];
 
 fn spawn_result<F>(future: F)
 where
@@ -208,6 +319,13 @@ pub fn start() -> Result<(), JsValue> {
         inline_redo_stack: Vec::new(),
         inline_last_snapshot: String::new(),
         inline_history_timeout: None,
+        slash_menu: element(&document, "#slash-menu")?,
+        slash_items: element(&document, "#slash-items")?,
+        slash_open: false,
+        slash_index: 0,
+        slash_kind: None,
+        slash_anchor: None,
+        slash_query: String::new(),
         sidebar: element(&document, "aside")?,
         sidebar_backdrop: element(&document, "#sidebar-backdrop")?,
         welcome_overlay: element(&document, "#welcome-overlay")?,
@@ -713,6 +831,7 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
     let editor = state.borrow().editor.clone();
 
     let input_state = state.clone();
+    let input_document = document.clone();
     listen(
         editor.as_ref(),
         "input",
@@ -721,6 +840,7 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
                 return;
             }
 
+            refresh_editor_chrome(&input_state, &input_document, EditorKind::Main);
             schedule_save(input_state.clone());
             schedule_history(input_state.clone(), EditorKind::Main);
         }),
@@ -736,11 +856,13 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
     )?;
 
     let composition_end = state.clone();
+    let composition_document = document.clone();
     listen(
         editor.as_ref(),
         "compositionend",
         Closure::<dyn FnMut(Event)>::new(move |_| {
             composition_end.borrow_mut().composing = false;
+            refresh_editor_chrome(&composition_end, &composition_document, EditorKind::Main);
             schedule_save(composition_end.clone());
             schedule_history(composition_end.clone(), EditorKind::Main);
         }),
@@ -761,6 +883,7 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
         editor.as_ref(),
         "blur",
         Closure::<dyn FnMut(Event)>::new(move |_| {
+            close_slash_menu(&blur_state);
             spawn_result(save_entry(blur_state.clone()));
         }),
     )?;
@@ -814,6 +937,52 @@ fn bind_events(state: &SharedState, document: &Document) -> Result<(), JsValue> 
             update_active_line(selection_state.clone(), &selection_document);
         }),
     )?;
+
+    let slash_pointerdown_state = state.clone();
+    listen(
+        state.borrow().slash_menu.as_ref(),
+        "pointerdown",
+        Closure::<dyn FnMut(Event)>::new(move |event: Event| {
+            if slash_pointerdown_state.borrow().slash_open {
+                event.prevent_default();
+            }
+        }),
+    )?;
+
+    let slash_click_state = state.clone();
+    let slash_click_document = document.clone();
+    listen(
+        state.borrow().slash_menu.as_ref(),
+        "click",
+        Closure::<dyn FnMut(Event)>::new(move |event| {
+            handle_slash_click(
+                slash_click_state.clone(),
+                &slash_click_document,
+                event,
+            );
+        }),
+    )?;
+
+    for event_name in ["wheel", "touchmove"] {
+        let dismiss_state = state.clone();
+        listen(
+            document.as_ref(),
+            event_name,
+            Closure::<dyn FnMut(Event)>::new(move |event: Event| {
+                let (open, inside) = {
+                    let state = dismiss_state.borrow();
+                    let inside = target_element(&event).is_some_and(|target| {
+                        state.slash_menu.contains(Some(&target))
+                    });
+                    (state.slash_open, inside)
+                };
+
+                if open && !inside {
+                    close_slash_menu(&dismiss_state);
+                }
+            }),
+        )?;
+    }
 
     let tag_state = state.clone();
     listen(
@@ -1468,6 +1637,10 @@ fn handle_keydown(state: SharedState, document: &Document, event: Event) {
         return;
     }
 
+    if handle_slash_keydown(state.clone(), document, &event) {
+        return;
+    }
+
     let modifier = event.meta_key() || event.ctrl_key();
 
     if modifier && event.key().eq_ignore_ascii_case("z") {
@@ -1530,13 +1703,398 @@ fn handle_beforeinput(
         return;
     }
 
-    if matches!(
+    if !matches!(
         event.input_type().as_str(),
         "insertParagraph" | "insertLineBreak"
-    ) && split_line(state, document, kind)
-    {
+    ) {
+        return;
+    }
+
+    if state.borrow().slash_open && apply_selected_slash_command(state.clone(), document) {
+        event.prevent_default();
+        return;
+    }
+
+    close_slash_menu(&state);
+
+    if split_line(state, document, kind) {
         event.prevent_default();
     }
+}
+
+fn refresh_editor_chrome(state: &SharedState, document: &Document, kind: EditorKind) {
+    let Some(editor) = editor_element(&state.borrow(), kind) else {
+        return;
+    };
+
+    markdown::update_empty_state(&editor);
+    sync_slash_menu(state.clone(), document, kind);
+}
+
+fn sync_slash_menu(state: SharedState, document: &Document, kind: EditorKind) {
+    let Some(editor) = editor_element(&state.borrow(), kind) else {
+        close_slash_menu(&state);
+        return;
+    };
+    let Some(line) = caret_line(document, &editor) else {
+        close_slash_menu(&state);
+        return;
+    };
+    let source = line.text_content().unwrap_or_default();
+    let Some((query, _)) = split_slash_source(&source) else {
+        close_slash_menu(&state);
+        return;
+    };
+
+    let query = query.to_string();
+    let reset_selection = {
+        let state = state.borrow();
+        !state.slash_open
+            || state.slash_kind != Some(kind)
+            || state.slash_query != query
+            || state.slash_anchor.as_ref().is_none_or(|anchor| {
+                !anchor.is_same_node(Some(line.as_ref()))
+            })
+    };
+
+    {
+        let mut state = state.borrow_mut();
+        state.slash_open = true;
+        state.slash_kind = Some(kind);
+        state.slash_anchor = Some(line);
+        state.slash_query = query;
+        if reset_selection {
+            state.slash_index = 0;
+        }
+    }
+
+    render_slash_menu(state);
+}
+
+fn render_slash_menu(state: SharedState) {
+    let (html, line, selected) = {
+        let state = state.borrow();
+        let commands = filtered_slash_commands(&state.slash_query);
+        let selected = state.slash_index.min(commands.len().saturating_sub(1));
+        (
+            slash_items_html(&commands, selected),
+            state.slash_anchor.clone(),
+            selected,
+        )
+    };
+    let Some(line) = line else {
+        close_slash_menu(&state);
+        return;
+    };
+
+    state.borrow_mut().slash_index = selected;
+
+    let (menu, items) = {
+        let state = state.borrow();
+        (state.slash_menu.clone(), state.slash_items.clone())
+    };
+
+    menu.remove_attribute("hidden").ok();
+    items.set_inner_html(&html);
+    position_slash_menu(&menu, &line);
+}
+
+fn position_slash_menu(menu: &Element, line: &Element) {
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+
+    let rect = line.get_bounding_client_rect();
+    let menu_rect = menu.get_bounding_client_rect();
+    let viewport_width = window
+        .inner_width()
+        .ok()
+        .and_then(|value| value.as_f64())
+        .unwrap_or(1024.0);
+    let viewport_height = window
+        .inner_height()
+        .ok()
+        .and_then(|value| value.as_f64())
+        .unwrap_or(768.0);
+    let margin = 12.0;
+    let left = rect
+        .x()
+        .clamp(margin, (viewport_width - menu_rect.width() - margin).max(margin));
+    let mut top = rect.y() + rect.height() + 6.0;
+
+    if top + menu_rect.height() > viewport_height - margin {
+        top = (rect.y() - menu_rect.height() - 6.0).max(margin);
+    }
+
+    menu.set_attribute(
+        "style",
+        &format!("left:{left}px;top:{top}px;"),
+    )
+    .ok();
+}
+
+fn close_slash_menu(state: &SharedState) {
+    let menu = {
+        let mut state = state.borrow_mut();
+        let menu = state.slash_menu.clone();
+
+        state.slash_open = false;
+        state.slash_index = 0;
+        state.slash_kind = None;
+        state.slash_anchor = None;
+        state.slash_query.clear();
+
+        menu
+    };
+
+    menu.set_attribute("hidden", "true").ok();
+}
+
+fn move_slash_selection(state: SharedState, direction: isize) {
+    let length = {
+        let state = state.borrow();
+        filtered_slash_commands(&state.slash_query).len()
+    };
+
+    if length == 0 {
+        return;
+    }
+
+    {
+        let mut state = state.borrow_mut();
+        let current = state.slash_index.min(length - 1) as isize;
+        state.slash_index = (current + direction).rem_euclid(length as isize) as usize;
+    }
+
+    highlight_slash_selection(&state);
+}
+
+fn highlight_slash_selection(state: &SharedState) {
+    let (menu, selected) = {
+        let state = state.borrow();
+        (state.slash_menu.clone(), state.slash_index)
+    };
+
+    if let Ok(Some(previous)) = menu.query_selector("[data-selected=\"true\"]") {
+        previous.remove_attribute("data-selected").ok();
+    }
+
+    if let Ok(Some(next)) = menu.query_selector(&format!("[data-slash-index=\"{selected}\"]")) {
+        next.set_attribute("data-selected", "true").ok();
+        next.scroll_into_view_with_bool(false);
+    }
+}
+
+fn handle_slash_keydown(
+    state: SharedState,
+    document: &Document,
+    event: &KeyboardEvent,
+) -> bool {
+    if !state.borrow().slash_open {
+        return false;
+    }
+
+    match event.key().as_str() {
+        "ArrowDown" => {
+            event.prevent_default();
+            move_slash_selection(state, 1);
+            true
+        }
+        "ArrowUp" => {
+            event.prevent_default();
+            move_slash_selection(state, -1);
+            true
+        }
+        "Enter" | "Tab"
+            if !event.meta_key() && !event.ctrl_key() && !event.alt_key() =>
+        {
+            if apply_selected_slash_command(state.clone(), document) {
+                event.prevent_default();
+                true
+            } else {
+                close_slash_menu(&state);
+                false
+            }
+        }
+        "Escape" => {
+            event.prevent_default();
+            close_slash_menu(&state);
+            true
+        }
+        _ => false,
+    }
+}
+
+fn handle_slash_click(state: SharedState, document: &Document, event: Event) {
+    let Some(target) = target_element(&event) else {
+        return;
+    };
+    let Ok(Some(button)) = target.closest("[data-slash-command]") else {
+        return;
+    };
+    let Some(id) = button.get_attribute("data-slash-command") else {
+        return;
+    };
+
+    event.prevent_default();
+
+    if !apply_slash_command(state.clone(), document, &id) {
+        close_slash_menu(&state);
+    }
+}
+
+fn apply_selected_slash_command(state: SharedState, document: &Document) -> bool {
+    let Some(id) = ({
+        let state = state.borrow();
+        let commands = filtered_slash_commands(&state.slash_query);
+        commands
+            .get(state.slash_index.min(commands.len().saturating_sub(1)))
+            .map(|command| command.id)
+    }) else {
+        return false;
+    };
+
+    apply_slash_command(state, document, id)
+}
+
+fn apply_slash_command(state: SharedState, document: &Document, id: &str) -> bool {
+    let Some(kind) = state.borrow().slash_kind else {
+        return false;
+    };
+    let Some(editor) = editor_element(&state.borrow(), kind) else {
+        return false;
+    };
+    let Some(line) = caret_line(document, &editor) else {
+        close_slash_menu(&state);
+        return false;
+    };
+    let source = line.text_content().unwrap_or_default();
+    let Some((_, remainder)) = split_slash_source(&source) else {
+        close_slash_menu(&state);
+        return false;
+    };
+    let Some(command) = SLASH_COMMANDS.iter().find(|command| command.id == id) else {
+        return false;
+    };
+
+    close_slash_menu(&state);
+    push_current_history(&state, kind);
+
+    let result = slash_result(command, remainder);
+
+    if matches!(command.action, SlashAction::Divider) {
+        markdown::render_line_into(&line, &result, false);
+
+        if let Some(next) = insert_line_after(document, &line, remainder, true) {
+            place_caret(document, &next, true);
+        } else {
+            place_caret(document, &line, false);
+        }
+    } else {
+        markdown::render_line_into(&line, &result, true);
+
+        if matches!(command.action, SlashAction::Prefix(_)) && remainder.is_empty() {
+            // Keep the prefix as plain text while the line is being edited so
+            // typed text lands after it, not inside the marker span.
+            line.set_text_content(Some(&result));
+            place_caret(document, &line, false);
+        } else {
+            let offset = match command.action {
+                SlashAction::Wrap(open, _) if remainder.is_empty() => utf16_len(open),
+                _ => utf16_len(&result),
+            };
+
+            place_caret_at_offset(document, &line, offset);
+        }
+    }
+
+    editor.focus().ok();
+    markdown::update_empty_state(&editor);
+    sync_snapshot(&state, kind);
+    schedule_save_kind(state, kind);
+    true
+}
+
+fn slash_items_html(commands: &[&'static SlashCommand], selected: usize) -> String {
+    if commands.is_empty() {
+        return r#"<div class="slash-empty">No matching blocks</div>"#.to_string();
+    }
+
+    let mut html = String::new();
+
+    for (index, command) in commands.iter().enumerate() {
+        let selected = if index == selected {
+            r#" data-selected="true""#
+        } else {
+            ""
+        };
+
+        html.push_str(&format!(
+            r#"<button type="button" class="slash-item" data-slash-index="{index}" data-slash-command="{id}"{selected}><span class="slash-icon" aria-hidden="true">{icon}</span><span class="slash-label">{label}</span></button>"#,
+            index = index,
+            id = command.id,
+            selected = selected,
+            icon = command.icon,
+            label = command.label,
+        ));
+    }
+
+    html
+}
+
+fn split_slash_source(source: &str) -> Option<(&str, &str)> {
+    let rest = source.strip_prefix('/')?;
+
+    if rest.chars().next().is_some_and(char::is_whitespace) {
+        return None;
+    }
+
+    let trimmed = rest.trim();
+
+    if !trimmed.is_empty()
+        && SLASH_COMMANDS.iter().any(|command| {
+            command.id.eq_ignore_ascii_case(trimmed)
+                || command.label.eq_ignore_ascii_case(trimmed)
+        })
+    {
+        return Some((trimmed, ""));
+    }
+
+    let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+    let query = &rest[..end];
+
+    if !query
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+    {
+        return None;
+    }
+
+    Some((query, rest[end..].trim_start()))
+}
+
+fn slash_result(command: &SlashCommand, remainder: &str) -> String {
+    match command.action {
+        SlashAction::Prefix(prefix) => format!("{prefix}{remainder}"),
+        SlashAction::Wrap(open, close) => format!("{open}{remainder}{close}"),
+        SlashAction::Plain => remainder.to_string(),
+        SlashAction::Divider => "---".to_string(),
+    }
+}
+
+fn filtered_slash_commands(query: &str) -> Vec<&'static SlashCommand> {
+    let query = query.to_lowercase();
+    let query = query.as_str();
+
+    SLASH_COMMANDS
+        .iter()
+        .filter(|command| {
+            query.is_empty()
+                || command.id.contains(query)
+                || command.label.to_lowercase().contains(query)
+                || command.keywords.contains(query)
+        })
+        .collect()
 }
 
 fn handle_global_keydown(state: SharedState, event: Event) {
@@ -3635,6 +4193,10 @@ fn sync_snapshot(state: &SharedState, kind: EditorKind) {
         EditorKind::Main => state.borrow_mut().last_snapshot = current,
         EditorKind::Inline => state.borrow_mut().inline_last_snapshot = current,
     }
+
+    if let Some(editor) = editor_element(&state.borrow(), kind) {
+        markdown::update_empty_state(&editor);
+    }
 }
 
 fn schedule_history(state: SharedState, kind: EditorKind) {
@@ -3725,6 +4287,8 @@ fn restore_source(
     kind: EditorKind,
     source: &str,
 ) {
+    close_slash_menu(state);
+
     let Some(editor) = editor_element(&state.borrow(), kind) else {
         return;
     };
@@ -3762,6 +4326,7 @@ fn handle_paste(
     }
 
     event.prevent_default();
+    close_slash_menu(&state);
 
     let Some(editor) = editor_element(&state.borrow(), kind) else {
         return;
@@ -3908,6 +4473,22 @@ fn update_active_line(state: SharedState, document: &Document) {
         return;
     }
 
+    let (slash_open, slash_same_line) = {
+        let state = state.borrow();
+        (
+            state.slash_open,
+            state.slash_anchor.as_ref().is_some_and(|anchor| {
+                new_line
+                    .as_ref()
+                    .is_some_and(|line| anchor.is_same_node(Some(line.as_ref())))
+            }),
+        )
+    };
+
+    if slash_open && !slash_same_line {
+        close_slash_menu(&state);
+    }
+
     if let Some(old) = old_line {
         let source = old.text_content().unwrap_or_default();
         markdown::render_line_into(&old, &source, false);
@@ -3919,6 +4500,8 @@ fn update_active_line(state: SharedState, document: &Document) {
 }
 
 fn split_line(state: SharedState, document: &Document, kind: EditorKind) -> bool {
+    close_slash_menu(&state);
+
     let Some(editor) = editor_element(&state.borrow(), kind) else {
         return false;
     };
@@ -3959,6 +4542,8 @@ fn split_line(state: SharedState, document: &Document, kind: EditorKind) -> bool
 }
 
 fn merge_line(state: SharedState, document: &Document, kind: EditorKind) -> bool {
+    close_slash_menu(&state);
+
     let Some(editor) = editor_element(&state.borrow(), kind) else {
         return false;
     };
@@ -4148,6 +4733,8 @@ fn utf16_len(value: &str) -> usize {
 }
 
 async fn load_entry(state: SharedState, iso: &str) -> Result<(), JsValue> {
+    close_slash_menu(&state);
+
     let result = opfs::read_entry(iso).await;
 
     match result {
@@ -4554,6 +5141,7 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
         .ok();
 
     let input_state = state.clone();
+    let input_document = document.clone();
     listen(
         editor.as_ref(),
         "input",
@@ -4562,6 +5150,7 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
                 return;
             }
 
+            refresh_editor_chrome(&input_state, &input_document, EditorKind::Inline);
             schedule_inline_save(input_state.clone());
             schedule_history(input_state.clone(), EditorKind::Inline);
         }),
@@ -4577,11 +5166,13 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
     )?;
 
     let composition_end = state.clone();
+    let composition_document = document.clone();
     listen(
         editor.as_ref(),
         "compositionend",
         Closure::<dyn FnMut(Event)>::new(move |_| {
             composition_end.borrow_mut().composing = false;
+            refresh_editor_chrome(&composition_end, &composition_document, EditorKind::Inline);
             schedule_inline_save(composition_end.clone());
             schedule_history(composition_end.clone(), EditorKind::Inline);
         }),
@@ -4607,6 +5198,7 @@ async fn start_inline_edit(state: SharedState, iso: String) -> Result<(), JsValu
         editor.as_ref(),
         "blur",
         Closure::<dyn FnMut(Event)>::new(move |_| {
+            close_slash_menu(&blur_state);
             let next_state = blur_state.clone();
             spawn_result(async move { save_inline(next_state).await.map(|_| ()) });
         }),
@@ -4666,6 +5258,8 @@ async fn finish_inline_edit(state: SharedState, save: bool) -> Result<(), JsValu
     if state.borrow().inline_iso.is_none() {
         return Ok(());
     }
+
+    close_slash_menu(&state);
 
     if save {
         state.borrow_mut().inline_save_timeout = None;
@@ -4976,4 +5570,62 @@ fn element(document: &Document, selector: &str) -> Result<Element, JsValue> {
 
 fn target_element(event: &Event) -> Option<Element> {
     event.target()?.dyn_into::<Element>().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        SLASH_COMMANDS, SlashCommand, filtered_slash_commands, slash_result,
+        split_slash_source,
+    };
+
+    fn command(id: &str) -> &'static SlashCommand {
+        SLASH_COMMANDS
+            .iter()
+            .find(|command| command.id == id)
+            .expect("missing slash command")
+    }
+
+    #[test]
+    fn slash_source_requires_a_command_token() {
+        assert_eq!(split_slash_source("/"), Some(("", "")));
+        assert_eq!(split_slash_source("/h1"), Some(("h1", "")));
+        assert_eq!(
+            split_slash_source("/h1 A title with spaces"),
+            Some(("h1", "A title with spaces")),
+        );
+        assert_eq!(
+            split_slash_source("/heading 1"),
+            Some(("heading 1", "")),
+        );
+        assert_eq!(
+            split_slash_source("/heading 1 "),
+            Some(("heading 1", "")),
+        );
+        assert_eq!(split_slash_source("plain text"), None);
+        assert_eq!(split_slash_source("/ h1"), None);
+        assert_eq!(split_slash_source("//example.com"), None);
+    }
+
+    #[test]
+    fn slash_commands_apply_without_markdown_knowledge() {
+        assert_eq!(slash_result(command("h1"), "A title"), "# A title");
+        assert_eq!(slash_result(command("bullet"), "Item one"), "- Item one");
+        assert_eq!(slash_result(command("bold"), "important"), "**important**");
+        assert_eq!(slash_result(command("text"), "plain"), "plain");
+        assert_eq!(slash_result(command("divider"), "ignored"), "---");
+    }
+
+    #[test]
+    fn slash_search_matches_labels_and_keywords() {
+        let h1 = filtered_slash_commands("h1");
+        assert_eq!(h1.len(), 1);
+        assert_eq!(h1[0].id, "h1");
+
+        let headings = filtered_slash_commands("heading");
+        assert!(headings.iter().all(|command| command.id.starts_with('h')));
+        assert_eq!(headings.len(), 3);
+
+        assert_eq!(filtered_slash_commands("").len(), SLASH_COMMANDS.len());
+    }
 }

@@ -195,6 +195,70 @@ class DainikiE2E(unittest.TestCase):
             "First line\nSecond line\nThird line",
         )
 
+    def test_slash_menu_and_empty_placeholder(self):
+        today = self.today()
+        editor = self.page.locator("#entry-editor")
+        self.assertEqual(editor.get_attribute("data-empty"), "true")
+        placeholder = self.page.evaluate(
+            """() => getComputedStyle(
+                document.querySelector("#entry-editor"), "::before"
+            ).content"""
+        )
+        self.assertIn("type / for commands", placeholder)
+
+        self.page.locator("#entry-editor .line").first.click()
+        self.page.keyboard.type("/")
+        self.page.wait_for_timeout(200)
+        self.assertTrue(self.page.locator("#slash-menu").is_visible())
+        self.assertGreaterEqual(
+            self.page.locator("#slash-menu [data-slash-command]").count(), 10
+        )
+
+        self.page.keyboard.type("h1")
+        self.page.wait_for_timeout(200)
+        self.assertEqual(
+            self.page.locator("#slash-menu [data-slash-command]").count(), 1
+        )
+        self.page.keyboard.press("Enter")
+        self.page.wait_for_timeout(200)
+        self.assertEqual(self.page.locator("#entry-editor .line.md-h1").count(), 1)
+        self.assertEqual(editor.get_attribute("data-empty"), "false")
+        self.assertFalse(self.page.locator("#slash-menu").is_visible())
+
+        self.page.keyboard.type("A title")
+        self.page.keyboard.press("Enter")
+        self.page.keyboard.type("/bullet")
+        self.page.wait_for_timeout(200)
+        self.page.keyboard.press("Enter")
+        self.page.keyboard.type("Item one")
+        self.page.wait_for_timeout(900)
+
+        self.assertEqual(self.read_entry(today), "# A title\n- Item one")
+        self.assertEqual(self.page.locator("#entry-editor .line.md-list").count(), 1)
+
+        self.page.keyboard.press(f"{MOD}+a")
+        self.page.keyboard.press("Backspace")
+        self.page.wait_for_timeout(500)
+        self.assertEqual(editor.get_attribute("data-empty"), "true")
+
+    def test_inline_empty_entry_placeholder(self):
+        yesterday = iso_shift(self.today(), -1)
+        self.seed([{"iso": yesterday, "text": ""}])
+        self.page.reload(wait_until="networkidle")
+        self.page.wait_for_timeout(900)
+
+        self.page.locator(f'[data-entry-card][data-iso="{yesterday}"]').click()
+        self.page.wait_for_timeout(500)
+
+        inline = self.page.locator("#timeline-entries .inline-live")
+        self.assertEqual(inline.get_attribute("data-empty"), "true")
+        placeholder = self.page.evaluate(
+            """() => getComputedStyle(
+                document.querySelector("#timeline-entries .inline-live"), "::before"
+            ).content"""
+        )
+        self.assertIn("type / for commands", placeholder)
+
     def test_inline_past_entry_editing(self):
         today = self.today()
         yesterday = iso_shift(today, -1)

@@ -3,6 +3,14 @@ use web_sys::Element;
 
 pub fn render_document(editor: &Element, markdown: &str) {
     editor.set_inner_html(&render_document_html(markdown));
+    update_empty_state(editor);
+}
+
+pub fn update_empty_state(editor: &Element) {
+    let empty = source_from_editor(editor).trim().is_empty();
+    editor
+        .set_attribute("data-empty", if empty { "true" } else { "false" })
+        .ok();
 }
 
 pub fn render_document_html(markdown: &str) -> String {

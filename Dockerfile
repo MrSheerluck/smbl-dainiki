@@ -13,6 +13,9 @@ RUN topcoat asset bundle -p dainiki-web --release
 
 FROM debian:bookworm-slim
 
+ARG DAINIKI_ASSET_VERSION=dev
+ENV DAINIKI_ASSET_VERSION=$DAINIKI_ASSET_VERSION
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*

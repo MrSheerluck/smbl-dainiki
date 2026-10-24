@@ -1,8 +1,9 @@
-const CACHE = "dainiki-shell-v4";
+const VERSION = new URL(self.location.href).searchParams.get("v") ?? "dev";
+const CACHE = `dainiki-shell-${VERSION}`;
 const SHELL = [
   "/",
-  "/loader.js?v=4",
-  "/pkg/dainiki_client.js?v=4",
+  `/loader.js?v=${VERSION}`,
+  `/pkg/dainiki_client.js?v=${VERSION}`,
   "/pkg/dainiki_client_bg.wasm",
   "/manifest.webmanifest",
   "/icon-192.png",

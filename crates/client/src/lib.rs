@@ -403,8 +403,15 @@ pub fn start() -> Result<(), JsValue> {
 async fn register_service_worker() -> Result<(), JsValue> {
     let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
     let container = window.navigator().service_worker();
+    let version = Reflect::get(
+        window.as_ref(),
+        &JsValue::from_str("__DAINIKI_ASSET_VERSION__"),
+    )
+    .ok()
+    .and_then(|value| value.as_string())
+    .unwrap_or_else(|| "dev".to_string());
 
-    JsFuture::from(container.register("/sw.js?v=4")).await?;
+    JsFuture::from(container.register(&format!("/sw.js?v={version}"))).await?;
     Ok(())
 }
 

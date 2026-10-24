@@ -19,6 +19,10 @@ fn app_origin() -> String {
         .to_string()
 }
 
+fn asset_version() -> String {
+    std::env::var("DAINIKI_ASSET_VERSION").unwrap_or_else(|_| "dev".to_string())
+}
+
 #[layout("/")]
 pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     response_headers(cx).append(
@@ -29,6 +33,7 @@ pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
     let path = uri(cx).path();
     let journal = path == "/";
     let origin = app_origin();
+    let asset_version = asset_version();
     let page_url = format!("{origin}{path}");
     let og_image = format!("{origin}/og.png");
     let title = match path {
@@ -110,7 +115,7 @@ pub async fn root(cx: &Cx, slot: Slot<'_>) -> Result<impl View> {
             <body class="bg-surface font-ui text-ui-body text-on-surface antialiased">
                 (slot)
                 if journal {
-                    <script type="module" src="/loader.js?v=4"></script>
+                    <script type="module" src=(format!("/loader.js?v={asset_version}"))></script>
                 }
             </body>
         </html>

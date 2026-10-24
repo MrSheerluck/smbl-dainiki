@@ -1,0 +1,45 @@
+name: deploy-vps
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          cat > ~/.ssh/known_hosts <<'EOF'
+          2.31.18.231 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHLb+Jgcum+ZIa4S+3ohKaczqMxzj9z1FOxw/P8EHLZW
+          EOF
+
+      - name: Pull and restart Dainiki
+        run: |
+          ssh -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            deploy@2.31.18.231 '
+              set -euo pipefail
+              cd /opt/smbl/apps/dainiki
+              docker compose pull
+              docker compose up -d --force-recreate
+              for _ in $(seq 1 30); do
+                status=$(docker inspect -f "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" dainiki 2>/dev/null || true)
+                echo "dainiki: $status"
+                if [ "$status" = healthy ]; then
+                  break
+                fi
+                sleep 2
+              done
+              docker inspect -f "image={{.Config.Image}} revision={{index .Config.Labels \"org.opencontainers.image.revision\"}}" dainiki
+              docker compose ps
+              docker compose logs --tail=25
+            '
